@@ -1,0 +1,36 @@
+{% load money %}
+{# the bill lines of the waiter's round, each with − qty + (every tap sends this block back) #}
+<div id="waiterSummary" class="pos-lines-box">
+    {% if cart.lines %}
+    <ul class="pos-lines">
+        {% for line in cart.lines %}
+        <li class="pos-line">
+            <div class="pos-line-name">
+                <strong>{{ line.name }}</strong>
+                <small>{{ line.rate|inr_short }} each</small>
+            </div>
+            <div class="pos-step" role="group" aria-label="Quantity of {{ line.name }}">
+                <button type="button" aria-label="One less {{ line.name }}"
+                        hx-post="{% url 'orders:waiter_cart_remove' table.pk line.item.pk %}"{% if line.portion %} hx-vals='{"portion": "{{ line.portion.pk }}"}'{% endif %}
+                        hx-target="#waiterSummary" hx-swap="outerHTML">
+                    <i class="bi {% if line.qty == 1 %}bi-trash3{% else %}bi-dash-lg{% endif %}" aria-hidden="true"></i>
+                </button>
+                <span class="pos-step-count" aria-live="polite">{{ line.qty }}</span>
+                <button type="button" aria-label="One more {{ line.name }}"
+                        hx-post="{% url 'orders:waiter_cart_add' table.pk line.item.pk %}"{% if line.portion %} hx-vals='{"portion": "{{ line.portion.pk }}"}'{% endif %}
+                        hx-target="#waiterSummary" hx-swap="outerHTML">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+            <strong class="pos-line-amount tnum">{{ line.amount|inr_short }}</strong>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="pos-empty">
+        <i class="bi bi-basket" aria-hidden="true"></i>
+        <strong>No dishes yet</strong>
+        <span>Tap a dish on the left to add it.</span>
+    </div>
+    {% endif %}
+</div>

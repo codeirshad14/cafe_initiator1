@@ -1,0 +1,22 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Reports{% endblock %}
+{% block crumbs %}<span>/</span><span>Insights</span><span>/</span><span>Reports</span>{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+{# the reports in their groups (reports/catalog/__init__.py); each opens for today #}
+{% for group, reports in groups %}
+<section class="report-group" aria-labelledby="group-{{ forloop.counter }}">
+    <h2 class="report-group-title" id="group-{{ forloop.counter }}">{{ group }}</h2>
+    <div class="report-grid">
+        {% for report in reports %}
+        <a class="report-card" href="{% url 'reports:report' report.slug %}" title="{{ report.about }}">
+            <span class="feature-icon"><i class="bi bi-{{ report.icon }}" aria-hidden="true"></i></span>
+            <strong>{{ report.title }}</strong>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,53 @@
+{% load money %}
+{% if bills %}
+<div class="table-wrap table-scroll">
+    <table class="data-table table-stack">
+        <thead>
+            <tr>
+                <th>Bill</th>
+                <th>Date</th>
+                <th>Table</th>
+                <th>Guest</th>
+                <th class="num">Amount</th>
+                <th class="num">Paid</th>
+                <th>Status</th>
+                <th class="text-end"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in bills %}
+            <tr{% if b.status == "CANCELLED" %} class="row-cancelled"{% endif %}>
+                <td class="cell-main"><a href="{% url 'billing:bill_detail' b.pk %}"><strong>#{{ b.bill_no }}</strong></a></td>
+                <td data-label="Date">{{ b.bill_date|date:"d M Y" }}<br><small class="text-body-secondary">{{ b.created_at|time:"h:i A" }}</small></td>
+                <td data-label="Table">{{ b.order.place_label }}</td>
+                <td data-label="Guest">{{ b.order.customer_name }}</td>
+                <td data-label="Amount" class="num"><strong>{{ b.grand_total|inr }}</strong></td>
+                <td data-label="Paid" class="num">{{ b.paid_amount|inr }}</td>
+                <td data-label="Status">{% include "billing/_bill_status.html" with bill=b %}</td>
+                <td class="cell-actions text-end">
+                    <div class="row-actions">
+                        <a class="btn btn-sm btn-light btn-icon" href="{% url 'billing:bill_detail' b.pk %}" title="Open" aria-label="Open bill {{ b.bill_no }}"><i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                        <a class="btn btn-sm btn-light btn-icon" href="{% url 'billing:bill_print' b.pk %}" target="_blank" rel="noopener"
+                           data-print="bill" data-print-slip="{% url 'billing:bill_print_slip' b.pk %}" data-print-name="Bill #{{ b.bill_no }}" title="Print" aria-label="Print bill {{ b.bill_no }}"><i class="bi bi-printer" aria-hidden="true"></i></a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="panel-foot register-foot">
+    <span>{{ date_from|date:"d M Y" }}{% if date_to != date_from %} – {{ date_to|date:"d M Y" }}{% endif %}</span>
+    <span>{{ totals.count }} bill{{ totals.count|pluralize }} (cancelled left out)</span>
+    <span>Total <strong>{{ totals.total|default:0|inr }}</strong></span>
+    <span>Paid <strong>{{ totals.paid|default:0|inr }}</strong></span>
+</div>
+{% url 'billing:bill_rows' as rows_url %}
+{% include "partials/_pager.html" with target="#billRows" include="#billFilters" what="bills" one="bill" %}
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
+    <h3>No bills in these dates</h3>
+    <p>Bills appear here once they are made from a table's page, or with New bill for a counter sale. Try other dates.</p>
+</div>
+{% endif %}

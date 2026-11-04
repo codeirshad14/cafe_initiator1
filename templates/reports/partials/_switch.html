@@ -1,0 +1,11 @@
+{# open another report, keeping the period (static/js/reports.js carries the address on) #}
+<label class="visually-hidden" for="reportSwitch">Open another report</label>
+<select class="form-select report-switch" id="reportSwitch" data-report-switch>
+    {% for group, entries in switch_groups %}
+    <optgroup label="{{ group }}">
+        {% for other_slug, other_title in entries %}
+        <option value="{% url 'reports:report' other_slug %}"{% if other_slug == slug %} selected{% endif %}>{{ other_title }}</option>
+        {% endfor %}
+    </optgroup>
+    {% endfor %}
+</select>

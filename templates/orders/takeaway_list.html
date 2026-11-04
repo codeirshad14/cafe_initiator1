@@ -1,0 +1,16 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Take away{% endblock %}
+{% block crumbs %}<span>/</span><a href="{% url 'orders:floor' %}">Floor</a><span>/</span><span>Take away</span>{% endblock %}
+{% block page_title %}Take away{% endblock %}
+
+{% block page_actions %}
+<a class="btn btn-light" href="{% url 'orders:floor' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Floor</a>
+{% if can_take_order %}
+<a class="btn btn-primary" href="{% url 'orders:waiter_order' table.pk %}"><i class="bi bi-bag-plus" aria-hidden="true"></i> New takeaway</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% include "orders/_takeaway_list.html" %}
+{% endblock %}

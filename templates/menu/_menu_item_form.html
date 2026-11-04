@@ -1,0 +1,63 @@
+{% extends "partials/_panel_form.html" %}
+
+{# a photo is a file, so this form is sent as multipart #}
+{% block form_attrs %} hx-encoding="multipart/form-data"{% endblock %}
+
+{% block fields %}
+<p class="form-section">Dish</p>
+{% include "partials/_field.html" with field=form.category %}
+{% include "partials/_field.html" with field=form.name %}
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.food_type %}
+    {% include "partials/_field.html" with field=form.price %}
+</div>
+{% include "partials/_field.html" with field=form.description %}
+{% include "partials/_field.html" with field=form.ingredients %}
+{% include "partials/_field.html" with field=form.prep_time %}
+
+{# sizes with their own price; empty rows are ignored #}
+<p class="form-section">Portions <span class="form-section-note">optional</span></p>
+<div class="portion-box">
+    {{ portions.management_form }}
+    {% if portions.non_form_errors %}<div class="field-error mb-2">{{ portions.non_form_errors|join:" " }}</div>{% endif %}
+    <div class="portion-head" aria-hidden="true"><span>Portion</span><span>Price (₹)</span><span></span></div>
+    {% for row in portions %}
+    <div class="portion-row{% if row.errors %} has-error{% endif %}">
+        {% for hidden in row.hidden_fields %}{{ hidden }}{% endfor %}
+        <label class="visually-hidden" for="{{ row.name.id_for_label }}">Portion name</label>
+        {{ row.name }}
+        <label class="visually-hidden" for="{{ row.price.id_for_label }}">Portion price</label>
+        {{ row.price }}
+        {% if row.instance.pk %}
+        <label class="portion-remove" title="Remove this portion">{{ row.DELETE }} <i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Remove</span></label>
+        {% else %}<span></span>{% endif %}
+        {% for error in row.non_field_errors %}<div class="field-error portion-error">{{ error }}</div>{% endfor %}
+        {% for field in row.visible_fields %}{% for error in field.errors %}<div class="field-error portion-error">{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
+    </div>
+    {% endfor %}
+    <datalist id="portionNames">
+        <option value="Qtr"><option value="Half"><option value="Full">
+        <option value="Small"><option value="Medium"><option value="Large">
+        <option value="Regular"><option value="250 ml"><option value="500 ml">
+    </datalist>
+    <div class="portion-help">
+        <button type="button" class="btn btn-sm btn-light" data-fill-portions="Qtr,Half,Full">Fill Qtr · Half · Full</button>
+        <span>Guests then pick the size. Leave the rows empty for a single-price dish.</span>
+    </div>
+</div>
+
+<p class="form-section">Photo</p>
+{% if item.image %}
+<div class="photo-current">
+    <img src="{{ item.image.url }}" alt="Current photo of {{ item.name }}">
+    <span>Current photo. Choose a new file to replace it.</span>
+</div>
+{% endif %}
+{% include "partials/_field.html" with field=form.image %}
+{% if form.remove_image %}{% include "partials/_field.html" with field=form.remove_image %}{% endif %}
+
+<p class="form-section">On the menu</p>
+{% include "partials/_field.html" with field=form.sort_order %}
+{% include "partials/_field.html" with field=form.is_available %}
+{% include "partials/_field.html" with field=form.is_active %}
+{% endblock %}

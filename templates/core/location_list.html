@@ -1,0 +1,26 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Locations{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><a href="{% url 'core:restaurant_settings' %}">Cafe profile</a><span>/</span><span>Locations</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-primary" type="button" hx-get="{% url 'core:location_add' %}" hx-target="#panel">
+    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add location
+</button>
+{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="locations" %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="panel-title">Locations</h2>
+            <p class="panel-sub">Each outlet has its own tables, Takeaway counter, and order, KOT, bill and booking numbers. The menu, bill settings and offers are shared. Switch location from the top bar.</p>
+        </div>
+    </div>
+    <div id="locationRows" hx-get="{% url 'core:location_rows' %}" hx-trigger="rowsChanged from:body" hx-include="#locationRows [name=page]">
+        {% include "core/_location_rows.html" %}
+    </div>
+</section>
+{% endblock %}

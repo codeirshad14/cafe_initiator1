@@ -1,0 +1,6 @@
+{# answer to a tap on the POS screen: the bill lines, plus "out of band" the tile's − qty + (or the size's), a sized dish's count, the total and the phone bar #}
+{% include "orders/_tile_step.html" with oob=True %}
+{% if has_sizes %}{% include "orders/_tile_count.html" with oob=True %}{% endif %}
+{% include "orders/_waiter_summary.html" %}
+{% include "orders/_waiter_total.html" with oob=True %}
+{% include "orders/_waiter_bar.html" with oob=True %}

@@ -1,0 +1,51 @@
+{% comment %}
+The guest menu list, shared by the QR ordering menu (ordering=True) and the
+public menu (ordering=False): sticky category tabs and food-type chips, then
+each category's dishes. static/js/menu.js runs the tabs, filters and the
+dish details sheet. Needs: categories, has_non_veg (+ table or restaurant).
+{% endcomment %}
+{% if categories %}
+<div class="gm-tabsbar" id="menuBar">
+    <div class="gm-wrap">
+      <div class="gm-tabs-card">
+        <nav class="gm-tabs" aria-label="Menu sections">
+            {% for c in categories %}
+            <a href="#cat-{{ c.pk }}" class="gm-tab{% if forloop.first %} is-active{% endif %}" data-chip="cat-{{ c.pk }}">{{ c.name }}</a>
+            {% endfor %}
+        </nav>
+        <div class="gm-chips" role="group" aria-label="Food type">
+            <button type="button" class="gm-chip is-active" data-diet="all" aria-pressed="true">All</button>
+            <button type="button" class="gm-chip" data-diet="VEG" aria-pressed="false"><span class="food-dot food-veg" aria-hidden="true"></span> Veg</button>
+            {% if has_non_veg %}<button type="button" class="gm-chip" data-diet="NON_VEG" aria-pressed="false"><span class="food-dot food-non_veg" aria-hidden="true"></span> Non-veg</button>{% endif %}
+        </div>
+      </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="gm-wrap gm-list" id="menuBoard"{% if ordering %} hx-sync="this:queue all"{% endif %}>
+    {% for c in categories %}
+    <section class="gm-section" id="cat-{{ c.pk }}" data-section aria-labelledby="gm-title-{{ c.pk }}">
+        {# no title on the card (the tabs and each dish show the category); kept for screen readers #}
+        <h2 class="visually-hidden" id="gm-title-{{ c.pk }}">{{ c.name }}</h2>
+        <div class="gm-dishes">
+            {% for item in c.menu_items %}
+            {% include "orders/_dish_row.html" %}
+            {% endfor %}
+        </div>
+    </section>
+    {% empty %}
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+        <h3>The menu is being set up</h3>
+        <p>{% if ordering %}Please ask the staff to take your order for now.{% else %}Please check again soon.{% endif %}</p>
+    </div>
+    {% endfor %}
+
+    <div class="empty-state" id="noMatch" hidden>
+        <span class="empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+        <h3>No dishes match</h3>
+        <p>Try another word or food type.</p>
+        <button type="button" class="btn btn-primary" id="clearFilters">Show all dishes</button>
+    </div>
+</div>

@@ -1,0 +1,124 @@
+{% extends "base_customer.html" %}
+{% load static money %}
+{% comment %}
+The guest menu: ONE page for every way of ordering, so it always looks the same.
+  at a table   /m/<qr_token>/   (orders.guest_views.customer_menu)  at_table=True
+  public       /r/<slug>/       (orders.guest_views.public_menu)    take away / delivery
+Only a few words change: the line under the name, the first slide's heading,
+and the button on the right (your order, Track at a table, Call on the public menu).
+Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
+       table + cart + my_order when ordering, at_table.
+{% endcomment %}
+
+{% block title %}{{ restaurant.name }} · {% if at_table %}{{ table.label }}{% else %}Menu{% endif %}{% endblock %}
+{% block app_class %} gm-page{% if ordering %} gm-page--ordering{% endif %}{% endblock %}
+
+{% block header %}
+<header class="gm-top">
+    <div class="gm-wrap">
+        <div class="gm-top-row">
+            <div class="gm-brand">
+                {% if restaurant.logo %}
+                <img class="gm-logo" src="{{ restaurant.logo.url }}" alt="">
+                {% else %}
+                <span class="gm-logo gm-logo--text" aria-hidden="true">{{ restaurant.name|slice:":1"|upper }}</span>
+                {% endif %}
+                <div class="gm-brand-text">
+                    <strong>{{ restaurant.name }}</strong>
+                    {% if at_table %}
+                    <small><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ table.label }}{% if table.section %} · {{ table.section }}{% endif %}</small>
+                    {% elif ordering %}
+                    <small><i class="bi bi-bag-check" aria-hidden="true"></i> Take away{% if restaurant.delivery_enabled %} · Delivery{% endif %}</small>
+                    {% else %}
+                    <small>{{ dish_count }} dishes · {{ categories|length }} categories</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% if my_order %}
+            <a class="gm-pill gm-pill--live" href="{% url 'orders:order_track' my_order.public_token %}">
+                <span class="live-dot" aria-hidden="true"></span> Order #{{ my_order.order_no }}
+            </a>
+            {% elif at_table %}
+            <a class="gm-pill" href="{% url 'orders:order_track_lookup' table.qr_token %}"><i class="bi bi-receipt" aria-hidden="true"></i> Track</a>
+            {% elif restaurant.phone %}
+            <a class="gm-pill gm-pill--call" href="tel:{{ restaurant.phone|cut:' ' }}"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Call</a>
+            {% endif %}
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap">
+    {# slider: slide 1 is the restaurant, then the photos set in Restaurant settings; static/js/menu.js moves it #}
+    {% with slides=restaurant.slides %}
+    <section class="gm-slider" data-slider aria-roledescription="carousel" aria-label="{{ restaurant.name }}">
+        <div class="gm-slides" data-slides tabindex="0">
+            <div class="gm-slide gm-banner" aria-roledescription="slide" aria-label="1 of {{ slides|length|add:1 }}">
+                <div class="gm-banner-text">
+                    <span class="gm-banner-kicker">{% if at_table %}Welcome to {{ table.label }}{% elif ordering %}Order take-away{% if restaurant.delivery_enabled %} or delivery{% endif %}{% else %}Our menu{% endif %}</span>
+                    <h1>{{ restaurant.name }}</h1>
+                    {% if at_table %}
+                    <p>Pick your dishes and order from your phone. It goes straight to the kitchen.</p>
+                    {% elif restaurant.address %}
+                    <p><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ restaurant.address|linebreaksbr }}</p>
+                    {% endif %}
+                </div>
+                <span class="gm-banner-art" aria-hidden="true">
+                    {% if restaurant.logo %}<span class="gm-banner-logo"><img src="{{ restaurant.logo.url }}" alt=""></span>
+                    {% elif featured %}{% include "orders/_plate.html" with item=featured size="xl" %}
+                    {% else %}<i class="bi bi-cup-hot"></i>{% endif %}
+                </span>
+            </div>
+            {% for slide in slides %}
+            <figure class="gm-slide gm-slide--photo" aria-roledescription="slide" aria-label="{{ forloop.counter|add:1 }} of {{ slides|length|add:1 }}">
+                <img src="{{ slide.image.url }}" alt="{{ slide.text }}" loading="lazy">
+                {% if slide.text %}<figcaption>{{ slide.text }}</figcaption>{% endif %}
+            </figure>
+            {% endfor %}
+        </div>
+        {% if slides %}
+        <div class="gm-dots" role="group" aria-label="Choose a slide">
+            <button type="button" class="gm-dot is-active" data-slide-to="0" aria-label="Slide 1" aria-current="true"></button>
+            {% for slide in slides %}<button type="button" class="gm-dot" data-slide-to="{{ forloop.counter }}" aria-label="Slide {{ forloop.counter|add:1 }}"></button>{% endfor %}
+        </div>
+        {% endif %}
+    </section>
+    {% endwith %}
+
+    {% if my_order and my_order.status == "BILLED" %}
+    <div class="c-notice c-notice--info gm-notice" role="status">
+        <i class="bi bi-receipt" aria-hidden="true"></i>
+        <span>The bill for your order #{{ my_order.order_no }} is ready. Anything you order now goes on a new bill.</span>
+    </div>
+    {% endif %}
+
+    {% if categories %}
+    <label class="gm-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="search" id="dishSearch" placeholder="Search the menu…" aria-label="Search the menu" autocomplete="off">
+    </label>
+    {% endif %}
+</div>
+
+{% include "orders/_menu_list.html" %}
+
+<footer class="gm-wrap">
+    <div class="gm-foot">
+        <div>
+            <strong>{{ restaurant.name }}</strong>
+            {% if restaurant.address %}<span>{{ restaurant.address|linebreaksbr }}</span>{% endif %}
+            {% if restaurant.phone %}<a href="tel:{{ restaurant.phone|cut:' ' }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ restaurant.phone }}</a>{% endif %}
+        </div>
+        <small>Prices in ₹, before GST. Menu by {{ brand_name }}.</small>
+    </div>
+</footer>
+{% endblock %}
+
+{% block bottom %}
+{% if ordering %}{% include "orders/_cart_bar.html" %}{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/menu.js' %}"></script>
+{% endblock %}

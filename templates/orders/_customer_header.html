@@ -1,0 +1,22 @@
+{% comment %}
+The top of the guest's inner pages (cart, order status, track lookup, booking):
+the same white card as the menu's top bar, with ← back (when back_url is given),
+a title and an optional line under it.
+Usage: {% include "orders/_customer_header.html" with back_url=... title="Your order" subtitle=... %}
+{% endcomment %}
+<header class="gm-top">
+    <div class="gm-wrap gm-wrap--narrow">
+        <div class="gm-top-row gm-top-row--title">
+            {% if back_url %}
+            <a class="gm-icon" href="{{ back_url }}" aria-label="Back to the menu"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
+            {% else %}
+            <span class="gm-icon gm-icon--ghost" aria-hidden="true"></span>
+            {% endif %}
+            <div class="gm-top-heading">
+                <h1 class="gm-top-title">{{ title }}</h1>
+                {% if subtitle %}<small>{{ subtitle }}</small>{% endif %}
+            </div>
+            <span class="gm-icon gm-icon--ghost" aria-hidden="true"></span>
+        </div>
+    </div>
+</header>

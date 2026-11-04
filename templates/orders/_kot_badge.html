@@ -1,0 +1,8 @@
+{# a KOT's status as a coloured badge; LATE when it is waiting too long #}
+{% if kot.status == "HELD" %}<span class="status-badge status-warning">To confirm</span>
+{% elif kot.status == "NEW" %}<span class="status-badge status-brand">New</span>
+{% elif kot.status == "PREPARING" %}<span class="status-badge status-warning">Preparing</span>
+{% elif kot.status == "READY" %}<span class="status-badge status-success">Ready</span>
+{% elif kot.status == "SERVED" %}<span class="status-badge status-muted">Served</span>
+{% else %}<span class="status-badge status-danger">Cancelled</span>{% endif %}
+{% if kot.is_late %}<span class="status-badge status-danger late-badge">Late</span>{% endif %}

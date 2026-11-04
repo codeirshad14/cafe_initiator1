@@ -1,0 +1,16 @@
+{% extends "base_customer.html" %}
+
+{% block title %}Not taking orders{% endblock %}
+
+{% block content %}
+<div class="empty-state c-closed">
+    <span class="empty-icon"><i class="bi bi-cup-hot" aria-hidden="true"></i></span>
+    {% if public %}
+    <h3>This menu is not available</h3>
+    <p>The link may be old, or the restaurant has switched its online menu off.</p>
+    {% else %}
+    <h3>This table is not taking orders right now</h3>
+    <p>The QR code may be old, or online ordering is switched off. Please ask the staff, they will be happy to take your order.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{# side panel on the kitchen board: every dish with its In stock / Out of stock switch #}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">Menu stock</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+<div class="side-panel-body">
+    <p class="form-text mt-0 mb-3">Switch a dish off when it runs out. Guests then see "Out of stock" straight away.</p>
+    {% for c in categories %}
+    <p class="form-section">{{ c.name }}</p>
+    <ul class="stock-list">
+        {% for item in c.menu_items %}
+        <li>
+            <span class="dish-name">{% include "partials/_food_dot.html" %} {{ item.name }}</span>
+            {% include "menu/_availability_toggle.html" %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% empty %}
+    <p class="text-body-secondary">No dishes on the menu yet.</p>
+    {% endfor %}
+</div>

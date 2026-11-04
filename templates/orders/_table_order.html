@@ -1,0 +1,145 @@
+{% load money %}
+{% comment %}
+The live part of a table's page: one running order and its KOTs. Asks again
+every 10 seconds; a KOT status button sends back this same block (screen=table).
+A table with separate bills shows a tab per order above it.
+{% endcomment %}
+<div id="tableOrder" hx-get="{{ poll_url }}" hx-trigger="every 10s, liveChanged from:body" hx-swap="outerHTML" hx-sync="this:queue all">
+{% if table_orders %}
+{# one tab per bill on this table, and "Separate bill" for someone else at the table #}
+<nav class="bill-tabs" aria-label="Orders on {{ table.label }}">
+    {% for o in table_orders %}
+    <a class="bill-tab{% if o == order %} is-active{% endif %}" href="{% url 'orders:floor_table' table.pk %}?order={{ o.pk }}"
+       {% if o == order %}aria-current="page"{% endif %}>
+        <strong>#{{ o.order_no }} · {{ o.customer_name }}</strong>
+        <small>{% if o.status == "BILLED" %}Bill printed{% else %}Open{% endif %}</small>
+    </a>
+    {% endfor %}
+    {% if can_take_order %}
+    <a class="bill-tab bill-tab--new" href="{% url 'orders:waiter_order' table.pk %}?bill=new">
+        <strong><i class="bi bi-plus-lg" aria-hidden="true"></i> Separate bill</strong>
+        <small>A new order on this table</small>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}
+{% if order %}
+<div class="split-grid">
+    <div class="kot-stack">
+        {% for kot in kots %}
+        <section class="panel kot-row{% if kot.is_late %} is-late{% endif %}{% if kot.status == 'CANCELLED' %} is-cancelled{% endif %}">
+            <header class="kot-row-head">
+                <div>
+                    <strong>Round {{ forloop.counter }} · KOT #{{ kot.kot_no }}</strong>
+                    <small>{{ kot.created_at|time:"h:i A" }} · {{ kot.age_min|duration }} ago</small>
+                </div>
+                {% include "orders/_kot_badge.html" %}
+            </header>
+            <ul class="kot-lines">
+                {% for line in kot.items.all %}
+                <li{% if line.is_cancelled %} class="is-cancelled"{% endif %}>
+                    <span><strong>{{ line.qty }} ×</strong> {{ line.item_name }}</span>
+                    <span class="tnum">{{ line.amount|inr }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if kot.note %}<p class="kot-note"><i class="bi bi-chat-left-text" aria-hidden="true"></i> {{ kot.note }}</p>{% endif %}
+            {% if kot.actions or can_print %}
+            <footer class="kot-row-actions">
+                {% for action in kot.actions %}
+                <button type="button" class="btn btn-sm {% if action.status == 'CANCELLED' %}btn-light btn-danger-soft{% else %}btn-primary{% endif %}"
+                        hx-post="{% url 'orders:kot_status' kot.pk action.status %}" hx-vals='{"screen": "table"}'
+                        hx-target="#tableOrder" hx-swap="outerHTML"
+                        {% if action.status == 'CANCELLED' %}hx-confirm="Cancel KOT #{{ kot.kot_no }}? The kitchen will stop it."{% endif %}>
+                    {{ action.label }}
+                </button>
+                {% endfor %}
+                {% if can_print %}
+                <a class="btn btn-sm btn-light" href="{% url 'orders:kot_print' kot.pk %}" target="_blank" rel="noopener"
+                   data-print="kot" data-print-slip="{% url 'orders:kot_print_slip' kot.pk %}" data-print-name="KOT #{{ kot.kot_no }}"><i class="bi bi-printer" aria-hidden="true"></i> Print KOT</a>
+                {% endif %}
+            </footer>
+            {% endif %}
+        </section>
+        {% empty %}
+        <section class="panel"><div class="empty-state"><h3>No rounds yet</h3></div></section>
+        {% endfor %}
+    </div>
+
+    <aside class="panel order-summary">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Order #{{ order.order_no }}</h2>
+                <p class="panel-sub">Started {{ order.created_at|time:"h:i A" }} · {{ order.get_source_display }}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-1">
+                {% if order.is_delivery %}<span class="status-badge status-brand">Delivery</span>
+                {% elif order.is_takeaway %}<span class="status-badge status-brand">Take away</span>{% endif %}
+                {% if order.status == "PENDING" %}<span class="status-badge status-warning">To confirm</span>
+                {% elif order.status == "BILLED" %}<span class="status-badge status-info">Bill printed</span>
+                {% elif order.status == "OPEN" %}<span class="status-badge status-warning">Open</span>
+                {% else %}<span class="status-badge status-muted">{{ order.get_status_display }}</span>{% endif %}
+            </div>
+        </div>
+        <div class="panel-body">
+            <dl class="info-list info-list--tight">
+                <div><dt>Guest</dt><dd>{{ order.customer_name }}</dd></div>
+                <div><dt>Mobile</dt><dd>{% if order.customer_phone %}<a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a>{% else %}—{% endif %}</dd></div>
+                {% if order.customer_address %}<div><dt>Address</dt><dd>{{ order.customer_address }}</dd></div>{% endif %}
+                {% if order.is_delivery %}
+                <div><dt>Rider</dt><dd>{{ order.rider.name|default:"Not given yet" }}</dd></div>
+                <div><dt>Delivery</dt><dd>{{ order.delivery_stage|capfirst }}</dd></div>
+                {% else %}
+                <div><dt>Waiter</dt><dd>{{ order.waiter.name|default:"—" }}</dd></div>
+                {% endif %}
+                <div><dt>Rounds</dt><dd>{{ kots|length }}</dd></div>
+            </dl>
+            <div class="summary-total">
+                <span>Ordered so far <small>(before GST)</small></span>
+                <strong>{{ total|inr }}</strong>
+            </div>
+            <div class="summary-actions">
+                {% if order.is_delivery %}
+                <a class="btn btn-light" href="{% url 'orders:deliveries' %}"><i class="bi bi-bicycle" aria-hidden="true"></i> Deliveries board</a>
+                {% endif %}
+                {% if can_take_order and order.status == "OPEN" %}
+                <a class="btn btn-primary" href="{% url 'orders:waiter_order' table.pk %}?bill={{ order.pk }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> New KOT</a>
+                {% endif %}
+                {% if can_bill %}
+                {% if order.status == "OPEN" %}
+                <a class="btn btn-primary" href="{% url 'billing:bill_create' order.pk %}">
+                    <i class="bi bi-receipt" aria-hidden="true"></i> {% if bill %}Generate bill again{% else %}Generate bill{% endif %}
+                </a>
+                {% elif bill %}
+                <a class="btn btn-primary" href="{% url 'billing:bill_detail' bill.pk %}">
+                    <i class="bi bi-wallet2" aria-hidden="true"></i> Take payment · Bill #{{ bill.bill_no }}
+                </a>
+                {% endif %}
+                {% elif bill and can_view_bill %}
+                {# the waiter: the amount to tell the guests, no payment #}
+                <a class="btn btn-light" href="{% url 'billing:bill_detail' bill.pk %}">
+                    <i class="bi bi-receipt" aria-hidden="true"></i> View bill #{{ bill.bill_no }} · {{ bill.grand_total|inr }}
+                </a>
+                {% endif %}
+                {% if can_cancel %}
+                <button type="button" class="btn btn-light btn-danger-soft" hx-get="{% url 'orders:order_cancel' order.pk %}" hx-target="#panel" hx-swap="innerHTML">
+                    <i class="bi bi-x-circle" aria-hidden="true"></i> Cancel order
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+</div>
+{% else %}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon empty-icon--ok"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+        <h3>{{ table.label }} is free</h3>
+        <p>No running order. Guests can scan the QR code, or you can take their order here.</p>
+        {% if can_take_order %}
+        <a class="btn btn-primary" href="{% url 'orders:waiter_order' table.pk %}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Take an order</a>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+</div>

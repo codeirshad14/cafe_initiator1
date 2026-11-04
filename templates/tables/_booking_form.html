@@ -1,0 +1,35 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{# from ... until: the quick buttons fill "Until" from "From" (static/js/app.js, "booking length") #}
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.date %}
+    {% include "partials/_field.html" with field=form.time %}
+</div>
+<div class="length-chips" role="group" aria-label="How long">
+    <span class="length-label">How long</span>
+    <button type="button" class="length-chip" data-length="30">30 min</button>
+    <button type="button" class="length-chip" data-length="60">1 h</button>
+    <button type="button" class="length-chip" data-length="120">2 h</button>
+    <button type="button" class="length-chip" data-length="180">3 h</button>
+    <button type="button" class="length-chip" data-length="300">5 h</button>
+    <button type="button" class="length-chip" data-length="day">Full day</button>
+    <button type="button" class="length-chip" data-length="2880">2 days</button>
+</div>
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.end_date %}
+    {% include "partials/_field.html" with field=form.end_time %}
+</div>
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.guests %}
+    {% include "partials/_field.html" with field=form.table %}
+</div>
+{% include "partials/_field.html" with field=form.customer_name %}
+{% include "partials/_field.html" with field=form.customer_phone %}
+{% include "partials/_field.html" with field=form.note %}
+{% include "partials/_field.html" with field=form.status %}
+<div class="form-note">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <span>The table is held from the start until the booking ends (leave “Until” empty for the usual 2 hours). On the day, the floor shows it red from an hour before.</span>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KOT #{{ kot.kot_no }} · {{ kot.order.table }}</title>
+    <link href="{% static 'css/app.css' %}" rel="stylesheet">
+</head>
+{# 80 mm thermal slip for the kitchen: dishes and quantities, no prices #}
+<body class="print-80">
+<div class="print-tools">
+    <button type="button" onclick="window.print()">Print again</button>
+    <button type="button" onclick="window.close()">Close</button>
+</div>
+
+<main class="slip">
+    <div class="slip-center slip-strong">{{ restaurant.name }}</div>
+    <div class="slip-center slip-title">KITCHEN ORDER TICKET</div>
+    <div class="slip-rule"></div>
+
+    <div class="slip-big">
+        <span>KOT #{{ kot.kot_no }}</span>
+        <span>{% if kot.order.is_delivery %}DELIVERY{% elif kot.order.is_takeaway %}TAKEAWAY{% else %}{{ kot.order.table }}{% endif %}</span>
+    </div>
+    {% if kot.order.is_delivery %}<div class="slip-center slip-parcel">*** DELIVERY - PACK IT ***</div>
+    {% elif kot.order.is_takeaway %}<div class="slip-center slip-parcel">*** TAKEAWAY - PACK IT ***</div>
+    {% else %}<div class="slip-center slip-head">DINE IN</div>{% endif %}
+    <div class="slip-row"><span>Order #{{ kot.order.order_no }}</span><span>Round {{ round_no }}</span></div>
+    <div class="slip-row"><span>{{ kot.created_at|date:"d-m-Y" }}</span><span>{{ kot.created_at|time:"h:i A" }}</span></div>
+    {% if kot.order.waiter %}<div class="slip-row"><span>Waiter</span><span>{{ kot.order.waiter.name }}</span></div>{% endif %}
+    <div class="slip-row"><span>Source</span><span>{{ kot.order.get_source_display }}</span></div>
+    <div class="slip-rule"></div>
+
+    <div class="slip-row slip-head"><span>QTY&nbsp;&nbsp;ITEM</span></div>
+    <div class="slip-rule slip-rule--thin"></div>
+    {% for line in items %}
+    <div class="slip-item"><span class="slip-qty">{{ line.qty }}</span><span>{{ line.item_name }}</span></div>
+    {% endfor %}
+    <div class="slip-rule"></div>
+    <div class="slip-row"><span>Total items</span><span>{{ items|length }}</span></div>
+
+    {% if kot.note %}
+    <div class="slip-rule"></div>
+    <div class="slip-note">NOTE: {{ kot.note }}</div>
+    {% endif %}
+    <div class="slip-rule"></div>
+    <div class="slip-center slip-small">Printed {% now "d-m-Y h:i A" %}</div>
+</main>
+
+<script>
+    // print as soon as the slip has loaded
+    window.addEventListener("load", function () { window.print(); });
+</script>
+</body>
+</html>

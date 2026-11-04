@@ -1,0 +1,20 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{% include "partials/_field.html" with field=form.name %}
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.start_date %}
+    {% include "partials/_field.html" with field=form.end_date %}
+</div>
+<div class="field-block{% if form.kind.errors %} has-error{% endif %}">
+    <span class="form-label">{{ form.kind.label }}</span>
+    <div class="seg-radio" role="radiogroup" aria-label="{{ form.kind.label }}">
+        {% for choice in form.kind %}<label class="seg-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}
+    </div>
+</div>
+<div class="field-row">
+    {% include "partials/_field.html" with field=form.value %}
+    {% include "partials/_field.html" with field=form.min_bill %}
+</div>
+{% include "partials/_field.html" with field=form.is_active %}
+{% endblock %}

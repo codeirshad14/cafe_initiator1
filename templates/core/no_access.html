@@ -1,0 +1,15 @@
+{% extends "base_staff.html" %}
+
+{% block title %}No access{% endblock %}
+{% block page_title %}No access{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon empty-icon--danger"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+        <h3>This page is not part of the {{ current_staff.get_role_display|lower }} role</h3>
+        <p>If you need it for your work, ask your restaurant admin to change your role.</p>
+        <a class="btn btn-primary" href="{% url 'core:home' %}"><i class="bi bi-house" aria-hidden="true"></i> Go to my start page</a>
+    </div>
+</section>
+{% endblock %}

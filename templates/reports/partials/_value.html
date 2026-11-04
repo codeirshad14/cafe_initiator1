@@ -1,0 +1,1 @@
+{% load money %}{% with value=cell.value kind=cell.kind %}{% if value is None %}—{% elif kind == "money" %}{{ value|inr }}{% elif kind == "percent" %}{{ value|percent }}%{% elif kind == "minutes" %}{{ value|duration }}{% elif kind == "date" %}{{ value|date:"d M Y" }}{% elif kind == "datetime" %}{{ value|date:"d M, h:i A" }}{% else %}{{ value }}{% endif %}{% endwith %}

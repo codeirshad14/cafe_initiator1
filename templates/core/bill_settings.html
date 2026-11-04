@@ -1,0 +1,80 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Bill & print{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><a href="{% url 'core:restaurant_settings' %}">Cafe profile</a><span>/</span><span>Bill &amp; print</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="bill" %}
+<div class="split-grid">
+    <form method="post" enctype="multipart/form-data" class="panel" novalidate>
+        {% csrf_token %}
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Bill &amp; print</h2>
+                <p class="panel-sub">Set once. Every bill prints this way, on paper and on screen.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            <p class="form-section">Top of the bill</p>
+            {% include "partials/_field.html" with field=form.print_name %}
+            {% include "partials/_field.html" with field=form.invoice_title %}
+            <datalist id="invoiceTitles">
+                <option value="TAX INVOICE"><option value="BILL"><option value="INVOICE"><option value="BILL OF SUPPLY"><option value="ESTIMATE">
+            </datalist>
+            {% include "partials/_field.html" with field=form.print_logo %}
+            {% if not restaurant.logo %}<p class="form-hint">No logo yet. Add it on the <a href="{% url 'core:restaurant_settings' %}">Profile</a> tab.</p>{% endif %}
+
+            <p class="form-section">Tax</p>
+            {% include "partials/_field.html" with field=form.print_tax_details %}
+
+            <p class="form-section">UPI payment</p>
+            {% include "partials/_field.html" with field=form.upi_id %}
+            {% if restaurant.upi_qr %}
+            <div class="photo-current photo-current--qr">
+                <img src="{{ restaurant.upi_qr.url }}" alt="Current UPI QR code">
+                <span>Current QR code. Choose a new file to replace it.</span>
+            </div>
+            {% endif %}
+            {% include "partials/_field.html" with field=form.upi_qr %}
+            {% if form.remove_upi_qr %}{% include "partials/_field.html" with field=form.remove_upi_qr %}{% endif %}
+            {% include "partials/_field.html" with field=form.print_upi %}
+
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2" aria-hidden="true"></i> Save bill settings</button>
+        </div>
+    </form>
+
+    <aside class="bill-side">
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">On the bill</h2>
+                    <p class="panel-sub">As saved. Save to see your changes here.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="bill-preview" aria-label="Bill preview">
+                    {% if restaurant.print_logo and restaurant.logo %}<img class="bill-preview-logo" src="{{ restaurant.logo.url }}" alt="">{% endif %}
+                    <strong>{{ restaurant.bill_name }}</strong>
+                    {% if restaurant.address %}<small>{{ restaurant.address|linebreaksbr }}</small>{% endif %}
+                    {% if restaurant.print_tax_details and restaurant.gstin %}<small>GSTIN: {{ restaurant.gstin }}</small>{% endif %}
+                    <span class="bill-preview-title">{{ restaurant.invoice_title }}</span>
+                    <span class="bill-preview-row"><span>Dine in · Table T1</span><span>Bill 1</span></span>
+                    <span class="bill-preview-row"><span>Subtotal</span><span>500.00</span></span>
+                    {% if restaurant.print_tax_details %}
+                    <span class="bill-preview-row"><span>CGST</span><span>12.50</span></span>
+                    <span class="bill-preview-row"><span>SGST</span><span>12.50</span></span>
+                    {% else %}
+                    <span class="bill-preview-row"><span>Taxes</span><span>25.00</span></span>
+                    {% endif %}
+                    <span class="bill-preview-row bill-preview-total"><span>TOTAL</span><span>₹525.00</span></span>
+                    {% if restaurant.shows_upi_on_bill %}
+                    {% if restaurant.upi_qr %}<img class="bill-preview-qr" src="{{ restaurant.upi_qr.url }}" alt="">{% endif %}
+                    {% if restaurant.upi_id %}<small>Pay by UPI: {{ restaurant.upi_id }}</small>{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,399 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ brand_name }} · QR ordering, KOT and GST billing for restaurants</title>
+    <meta name="description" content="Guests scan a QR code on the table, order from their phone, and the order goes straight to your kitchen. GST bills and split payments in seconds.">
+
+    <meta name="theme-color" content="#da3831">
+    <meta name="color-scheme" content="light">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{% static 'css/app.css' %}" rel="stylesheet">
+</head>
+
+<body class="site" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+{# ================================================================ top bar #}
+<header class="site-nav navbar navbar-expand-lg sticky-top">
+    <div class="site-container">
+        <a class="site-brand" href="#top">
+            <span class="brand-mark" aria-hidden="true"><i class="bi bi-qr-code-scan"></i></span>
+            {{ brand_name }}
+        </a>
+
+        <button class="site-toggler navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteMenu"
+                aria-controls="siteMenu" aria-expanded="false" aria-label="Open menu">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <nav class="collapse navbar-collapse" id="siteMenu" aria-label="Website">
+            <ul class="navbar-nav site-links">
+                <li><a class="site-link" href="#features">Features</a></li>
+                <li><a class="site-link" href="#how">How it works</a></li>
+                <li><a class="site-link" href="#plans">Plans</a></li>
+                <li><a class="site-link" href="#faq">FAQ</a></li>
+            </ul>
+            <div class="site-nav-actions">
+                {% if current_staff %}
+                <a class="btn btn-primary" href="{% url 'core:home' %}"><i class="bi bi-speedometer2" aria-hidden="true"></i> Open {{ current_restaurant.name }}</a>
+                {% else %}
+                <a class="btn btn-light" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Staff login</a>
+                <a class="btn btn-primary" href="#demo">Book a free demo</a>
+                {% endif %}
+            </div>
+        </nav>
+    </div>
+</header>
+
+<main id="top">
+
+    {# ============================================================== hero #}
+    <section class="site-hero">
+        <div class="site-container hero-grid">
+            <div class="hero-copy">
+                <span class="eyebrow"><i class="bi bi-stars" aria-hidden="true"></i> QR ordering · KOT · GST billing</span>
+                <h1>Guests order from the table. <span>Your kitchen starts cooking.</span></h1>
+                <p class="hero-lead">
+                    Put a QR code on every table. Guests scan it with their phone camera, pick their dishes and place
+                    the order: no app, no waiting for a waiter. It lands on your kitchen screen as a KOT, and the GST
+                    bill is ready when they are.
+                </p>
+                <div class="hero-ctas">
+                    <a class="btn btn-primary btn-lg" href="#demo">Book a free demo <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    <a class="btn btn-light btn-lg" href="#how"><i class="bi bi-play-circle" aria-hidden="true"></i> See how it works</a>
+                </div>
+                <ul class="hero-points">
+                    <li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> No app for guests</li>
+                    <li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Works on any smartphone</li>
+                    <li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> GST-ready bills</li>
+                </ul>
+            </div>
+
+            {# a drawing of the guest's phone, made in HTML and CSS #}
+            <div class="hero-visual" aria-hidden="true">
+                <div class="hero-glow"></div>
+                <div class="phone">
+                    <div class="phone-notch"></div>
+                    <div class="phone-screen">
+                        <div class="pm-head">
+                            <span class="pm-logo">SG</span>
+                            <div><strong>Spice Garden</strong><small>Table T4 · AC Hall</small></div>
+                        </div>
+                        <div class="pm-chips"><span class="is-on">Starters</span><span>Mains</span><span>Breads</span><span>Desserts</span></div>
+                        <div class="pm-item">
+                            <div class="pm-text">
+                                <b><span class="food-dot food-veg"></span> Paneer Tikka</b>
+                                <small>Smoky, charred cottage cheese</small>
+                                <em>₹249</em>
+                            </div>
+                            <div class="pm-img pm-img--1"><span class="pm-step">−&nbsp;&nbsp;1&nbsp;&nbsp;+</span></div>
+                        </div>
+                        <div class="pm-item">
+                            <div class="pm-text">
+                                <b><span class="food-dot food-non_veg"></span> Chicken 65</b>
+                                <small>Crisp, curry-leaf tempered</small>
+                                <em>₹299</em>
+                            </div>
+                            <div class="pm-img pm-img--2"><span class="pm-add">ADD</span></div>
+                        </div>
+                        <div class="pm-item">
+                            <div class="pm-text">
+                                <b><span class="food-dot food-veg"></span> Dal Makhani</b>
+                                <small>Slow-cooked black lentils</small>
+                                <em>₹219</em>
+                            </div>
+                            <div class="pm-img pm-img--3"><span class="pm-step">−&nbsp;&nbsp;1&nbsp;&nbsp;+</span></div>
+                        </div>
+                        <div class="pm-cart"><span>2 items · ₹468</span><span>View cart <i class="bi bi-arrow-right"></i></span></div>
+                    </div>
+                </div>
+                <div class="float-card float-card--kot">
+                    <span class="float-icon"><i class="bi bi-fire"></i></span>
+                    <div><strong>KOT #34 sent to kitchen</strong><small>Table T4 · 2 items</small></div>
+                </div>
+                <div class="float-card float-card--paid">
+                    <span class="float-icon"><i class="bi bi-check2-circle"></i></span>
+                    <div><strong>Paid ₹1,240</strong><small>UPI ₹740 + Cash ₹500</small></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ========================================================= who it's for #}
+    <section class="site-strip" aria-label="Made for">
+        <div class="site-container strip-row">
+            <span class="strip-label">Made for</span>
+            <span><i class="bi bi-cup-hot" aria-hidden="true"></i> Cafés</span>
+            <span><i class="bi bi-people" aria-hidden="true"></i> Family restaurants</span>
+            <span><i class="bi bi-lightning-charge" aria-hidden="true"></i> Quick service</span>
+            <span><i class="bi bi-moon-stars" aria-hidden="true"></i> Bars &amp; lounges</span>
+            <span><i class="bi bi-shop" aria-hidden="true"></i> Food courts</span>
+        </div>
+    </section>
+
+    {# ============================================================ features #}
+    <section id="features" class="site-section">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">Everything in one place</span>
+                <h2>From the first scan to the final bill</h2>
+                <p>One system for your guests, your kitchen, your waiters and your cash counter. It runs in the browser, on the phones and tablets you already have.</p>
+            </div>
+
+            <div class="feature-grid">
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-qr-code-scan" aria-hidden="true"></i></span>
+                    <h3>A QR menu on every table</h3>
+                    <p>Each table gets its own secure QR code. Guests see your live menu with photos and veg / non-veg marks.</p>
+                </article>
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-phone" aria-hidden="true"></i></span>
+                    <h3>Ordering without an app</h3>
+                    <p>Guests add dishes, place the order and order again for the next round, straight from the phone browser.</p>
+                </article>
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-fire" aria-hidden="true"></i></span>
+                    <h3>A live kitchen board</h3>
+                    <p>New KOTs appear on the kitchen screen by themselves. One tap moves them to Preparing, then Ready.</p>
+                </article>
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+                    <h3>Waiters in the loop</h3>
+                    <p>Waiters see what is ready to serve, and can take the order on their phone for guests who prefer to ask.</p>
+                </article>
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
+                    <h3>GST bills in seconds</h3>
+                    <p>One bill from every round, with discount, CGST + SGST and round off. Prints on 80&nbsp;mm thermal printers.</p>
+                </article>
+                <article class="feature-card">
+                    <span class="feature-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></span>
+                    <h3>Split payments</h3>
+                    <p>Cash, card, UPI or online, in any mix on one bill. The change to return is shown on screen.</p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    {# ======================================================== how it works #}
+    <section id="how" class="site-section site-section--tint">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">How it works</span>
+                <h2>Four steps. No paper slips.</h2>
+            </div>
+
+            <ol class="steps">
+                <li class="step">
+                    <span class="step-no">1</span>
+                    <span class="step-icon"><i class="bi bi-qr-code" aria-hidden="true"></i></span>
+                    <h3>Scan</h3>
+                    <p>The guest scans the table's QR code with the phone camera or Google Lens.</p>
+                </li>
+                <li class="step">
+                    <span class="step-no">2</span>
+                    <span class="step-icon"><i class="bi bi-bag-plus" aria-hidden="true"></i></span>
+                    <h3>Order</h3>
+                    <p>They pick dishes, add a note like "less spicy" and place the order. No login.</p>
+                </li>
+                <li class="step">
+                    <span class="step-no">3</span>
+                    <span class="step-icon"><i class="bi bi-fire" aria-hidden="true"></i></span>
+                    <h3>Cook</h3>
+                    <p>The KOT appears in the kitchen. The guest watches the status change live.</p>
+                </li>
+                <li class="step">
+                    <span class="step-no">4</span>
+                    <span class="step-icon"><i class="bi bi-credit-card" aria-hidden="true"></i></span>
+                    <h3>Pay</h3>
+                    <p>The cashier makes one GST bill from all rounds and records the payment. The table is free again.</p>
+                </li>
+            </ol>
+        </div>
+    </section>
+
+    {# ============================================================== roles #}
+    <section class="site-section">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">One system, every role</span>
+                <h2>Everyone sees just what they need</h2>
+                <p>Each person gets their own login, and their role decides their screens. Your data stays yours: no other restaurant can ever see it.</p>
+            </div>
+
+            <div class="role-grid">
+                <article class="role-card">
+                    <span class="role-pill role-admin">Owner &amp; manager</span>
+                    <ul>
+                        <li>Today's sales at a glance</li>
+                        <li>Change dishes and prices any time</li>
+                        <li>Staff logins and roles</li>
+                        <li>Sales, item, table and waiter reports</li>
+                    </ul>
+                </article>
+                <article class="role-card">
+                    <span class="role-pill role-kitchen">Kitchen</span>
+                    <ul>
+                        <li>New, preparing and ready columns</li>
+                        <li>Late KOTs marked in red</li>
+                        <li>Mark a dish out of stock</li>
+                        <li>Print KOTs on 80&nbsp;mm paper</li>
+                    </ul>
+                </article>
+                <article class="role-card">
+                    <span class="role-pill role-waiter">Waiters</span>
+                    <ul>
+                        <li>Free and occupied tables</li>
+                        <li>Ready-to-serve list</li>
+                        <li>Take orders on the phone</li>
+                        <li>Mark dishes as served</li>
+                    </ul>
+                </article>
+                <article class="role-card">
+                    <span class="role-pill role-cashier">Cashier</span>
+                    <ul>
+                        <li>Bill from every round of the visit</li>
+                        <li>Discount, GST and round off</li>
+                        <li>Cash, card and UPI on one bill</li>
+                        <li>Bill register by date</li>
+                    </ul>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    {# ============================================================== plans #}
+    <section id="plans" class="site-section site-section--tint">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">Plans</span>
+                <h2>Simple membership, monthly or yearly</h2>
+                <p>Every plan has every feature. Pick how you want to pay, and we will share today's price on the demo call.</p>
+            </div>
+
+            <div class="plan-grid">
+                <article class="plan-box">
+                    <h3>Monthly</h3>
+                    <p class="plan-tagline">Pay month by month.</p>
+                    <ul class="plan-list">
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Unlimited tables and QR codes</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Unlimited orders and bills</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Kitchen, waiter and cashier screens</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Reports with CSV export</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> {{ included_logins }} staff logins included</li>
+                    </ul>
+                    <a class="btn btn-light w-100" href="#demo">Ask for the price</a>
+                </article>
+                <article class="plan-box plan-box--best">
+                    <span class="plan-ribbon">Best value</span>
+                    <h3>Yearly</h3>
+                    <p class="plan-tagline">One payment, twelve months of peace.</p>
+                    <ul class="plan-list">
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Everything in Monthly</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> One renewal a year, nothing to remember monthly</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> Renews from the day it ends: no paid day lost</li>
+                        <li><i class="bi bi-check2" aria-hidden="true"></i> {{ included_logins }} staff logins included</li>
+                    </ul>
+                    <a class="btn btn-primary w-100" href="#demo">Ask for the price</a>
+                </article>
+            </div>
+            <p class="plan-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Need more staff logins? We can raise the limit on any plan.</p>
+        </div>
+    </section>
+
+    {# ================================================================ FAQ #}
+    <section id="faq" class="site-section">
+        <div class="site-container site-container--narrow">
+            <div class="section-head">
+                <span class="eyebrow">Questions</span>
+                <h2>Good to know</h2>
+            </div>
+
+            <div class="faq">
+                <details>
+                    <summary>Do my guests need to install an app?</summary>
+                    <p>No. The QR code opens your menu in the phone's browser. Guests type their name and order. That is all.</p>
+                </details>
+                <details>
+                    <summary>What do I need to start?</summary>
+                    <p>An internet connection and any phone, tablet or computer for your staff. Print the QR sheet, stick the codes on your tables, and you are ready. An 80&nbsp;mm thermal printer is useful for KOTs and bills.</p>
+                </details>
+                <details>
+                    <summary>Can guests order a second round?</summary>
+                    <p>Yes. Each round goes to the kitchen as a new KOT on the same table order, and the final bill brings every round together.</p>
+                </details>
+                <details>
+                    <summary>Can someone order for a table they are not sitting at?</summary>
+                    <p>No. Every QR code carries a long secret code, not the table number, so nobody can guess another table's link. Switching a table off stops its code at once.</p>
+                </details>
+                <details>
+                    <summary>Do you take the payment from guests?</summary>
+                    <p>Not for now. Guests pay you the way they do today, by cash, card or UPI, and your cashier records how they paid. Split payments are fully supported.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    {# ===================================================== demo + contact #}
+    <section id="demo" class="site-section site-cta">
+        <div class="site-container cta-grid">
+            <div class="cta-copy">
+                <span class="eyebrow eyebrow--light">Free demo</span>
+                <h2>See it working with your own menu</h2>
+                <p>Leave your number and we will call you to set up a short demo. We can load a few of your dishes so you see exactly what your guests will see.</p>
+                <ul class="cta-contact">
+                    {% if contact_phone %}
+                    <li><i class="bi bi-telephone" aria-hidden="true"></i> <a href="tel:{{ contact_phone }}">{{ contact_phone }}</a></li>
+                    <li><i class="bi bi-whatsapp" aria-hidden="true"></i> <a href="https://wa.me/{{ contact_phone|cut:'+'|cut:' ' }}" target="_blank" rel="noopener">WhatsApp us</a></li>
+                    {% endif %}
+                    {% if contact_email %}
+                    <li><i class="bi bi-envelope" aria-hidden="true"></i> <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="cta-card" id="demoBox">
+                {% include "web/_demo_form.html" %}
+            </div>
+        </div>
+    </section>
+</main>
+
+{# ============================================================== footer #}
+<footer class="site-footer">
+    <div class="site-container footer-row">
+        <a class="site-brand" href="#top">
+            <span class="brand-mark" aria-hidden="true"><i class="bi bi-qr-code-scan"></i></span>
+            {{ brand_name }}
+        </a>
+        <nav class="footer-links" aria-label="Footer">
+            <a href="#features">Features</a>
+            <a href="#plans">Plans</a>
+            <a href="#faq">FAQ</a>
+            <a href="{% url 'login' %}">Staff login</a>
+        </nav>
+        <small>&copy; {% now "Y" %} {{ brand_name }}. Made for Indian restaurants.</small>
+    </div>
+</footer>
+
+<div class="toast-area" id="toastArea" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<script src="{% static 'js/app.js' %}"></script>
+<script>
+    // phone: close the menu after tapping a link in it
+    document.querySelectorAll("#siteMenu a[href^='#']").forEach(function (link) {
+        link.addEventListener("click", function () {
+            var menu = document.getElementById("siteMenu");
+            if (menu.classList.contains("show")) bootstrap.Collapse.getOrCreateInstance(menu).hide();
+        });
+    });
+</script>
+</body>
+</html>

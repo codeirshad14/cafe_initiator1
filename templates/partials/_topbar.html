@@ -1,0 +1,103 @@
+{% load money %}
+{# phones / tablets open the menu with ☰ here, or More in the bottom bar (partials/_bottom_nav.html) #}
+<header class="topbar">
+    <button class="icon-btn topbar-menu d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar"
+            aria-controls="sidebar" aria-label="Open menu">
+        <i class="bi bi-list" aria-hidden="true"></i>
+    </button>
+    {# desktop: fold the menu down to icons (static/js/app.js remembers it) #}
+    <button class="icon-btn nav-toggle" type="button" id="navToggle"
+            aria-controls="sidebar" aria-expanded="true" aria-label="Collapse menu" title="Collapse menu">
+        <i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>
+    </button>
+
+    {# phones / tablets: the brand mark, like an app's header #}
+    <span class="topbar-mark" aria-hidden="true"><i class="bi bi-qr-code-scan"></i></span>
+
+    <div class="topbar-title">
+        <strong class="truncate">{{ current_restaurant.name }}</strong>
+        <small>{% if my_locations %}{{ current_location.name }} · {% endif %}{% now "l, d M" %}</small>
+    </div>
+
+    <div class="topbar-actions">
+        {# the bell: new orders at this location (orders/_notification_bell.html), filled in at once #}
+        {% if not current_restaurant.menu_only %}
+        <div id="notifyBell" hx-get="{% url 'orders:notification_bell' %}" hx-trigger="load" hx-swap="outerHTML">
+            <span class="icon-btn" aria-hidden="true"><i class="bi bi-bell"></i></span>
+        </div>
+        {% endif %}
+
+        {# more than one location: which one this screen shows (core/locations.py) #}
+        {% if my_locations %}
+        <div class="dropdown">
+            <button class="location-chip" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Location: {{ current_location.name }}. Change">
+                <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
+                <span class="truncate">{{ current_location.name }}</span>
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <h6 class="dropdown-header">Work at</h6>
+                {% for place in my_locations %}
+                <form method="post" action="{% url 'core:switch_location' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="location" value="{{ place.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="dropdown-item{% if place == current_location %} active{% endif %}"{% if place == current_location %} aria-current="true"{% endif %}>
+                        <i class="bi bi-shop" aria-hidden="true"></i> {{ place.name }}
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="dropdown">
+            <button class="user-chip" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
+                <span class="avatar avatar-sm">{{ current_staff.initials }}</span>
+                <span class="user-chip-text d-none d-sm-flex">
+                    <strong>{{ current_staff.name }}</strong>
+                    <small>{{ current_staff.get_role_display }}</small>
+                </span>
+                <i class="bi bi-chevron-down user-chip-caret" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end user-menu">
+                <div class="user-menu-head">
+                    <span class="avatar">{{ current_staff.initials }}</span>
+                    <div class="min-w-0">
+                        <strong class="truncate">{{ current_staff.name }}</strong>
+                        <small class="truncate">{{ user.email|default:user.username }}</small>
+                        <span class="role-pill role-{{ current_staff.role|lower }}">{{ current_staff.get_role_display }}</span>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                {# the company's settings (admin and manager: core/roles.py COMPANY) #}
+                {% if current_staff.works_everywhere %}
+                <a class="dropdown-item" href="{% url 'core:restaurant_settings' %}"><i class="bi bi-shop" aria-hidden="true"></i> Create Update Profile</a>
+                <a class="dropdown-item" href="{% url 'core:staff_list' %}"><i class="bi bi-people" aria-hidden="true"></i> Staff</a>
+                {% endif %}
+                {# the plan, till when the logins work, and this year's bills (set by us in the Django admin) #}
+                <div class="user-menu-plan">
+                    <i class="bi bi-gem" aria-hidden="true"></i>
+                    <div>
+                        <strong>{{ current_restaurant.get_tier_display }} plan · {{ current_restaurant.get_plan_display|lower }}</strong>
+                        <small>Valid till {{ current_restaurant.membership_end|date:"d M Y" }} · {{ current_restaurant.membership_days_left }} day{{ current_restaurant.membership_days_left|pluralize }} left</small>
+                        {% if not current_restaurant.menu_only %}
+                        {% with usage=current_restaurant.plan_usage %}
+                        <small>Bills this year: {{ usage.bills|indian }}{% if usage.limit %} of {{ usage.limit|indian }}{% else %} (no limit){% endif %}</small>
+                        {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                {% if user.is_superuser %}
+                <a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Django admin</a>
+                {% endif %}
+                {# Django's LogoutView only accepts POST, so logout is a form #}
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i> Log out</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>

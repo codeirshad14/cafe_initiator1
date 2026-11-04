@@ -1,0 +1,7 @@
+{% comment %}
+Floor, This week / This month / Range: only the bookings of those days, date by
+date (the live table tiles are for today). Each booking can be edited or given a
+table in the side panel; Confirm / Seated / No-show are on the Bookings page.
+{% endcomment %}
+{% include "tables/_booking_summary_head.html" with show_bookings_link=True %}
+{% include "tables/_booking_days.html" with days=summary_days %}

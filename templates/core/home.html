@@ -1,0 +1,14 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Welcome{% endblock %}
+{% block page_title %}Welcome, {{ current_staff.name }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-cup-hot" aria-hidden="true"></i></span>
+        <h3>Your {{ current_staff.get_role_display|lower }} screens are on the way</h3>
+        <p>They will appear in the left menu as soon as they are ready. Until then there is nothing to do here.</p>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% load money %}
+{% comment %}
+Everything about one dish, all in its own card: big round photo, name, tags
+(category · veg / non-veg · prep time), about, ingredients, and — when
+ordering — the sizes, quantity and "Add" with the live total.
+Shown inside the sheet (in_sheet=True) or on its own page.
+Needs: item (with .sizes), ordering, back_url, table (ordering) or takeaway_url (public).
+{% endcomment %}
+<div class="gm-detail">
+    <header class="gm-detail-head">
+        {% if in_sheet %}
+        <button type="button" class="gm-icon" data-sheet-close aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        {% else %}
+        <a class="gm-icon" href="{{ back_url }}" aria-label="Back to the menu"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>
+        {% endif %}
+        <span class="gm-detail-heading">Dish details</span>
+        <span class="gm-icon gm-icon--ghost" aria-hidden="true"></span>
+    </header>
+
+    <div class="gm-detail-hero">
+        {% include "orders/_plate.html" with size="lg" %}
+        {% if not item.is_available %}<span class="gm-sold gm-sold--big">Sold out today</span>{% endif %}
+    </div>
+
+    <h2 class="gm-detail-name" id="sheetTitle">{{ item.name }}</h2>
+    <p class="gm-detail-tags">
+        <span>{{ item.category.name }}</span>
+        <span class="gm-dot-sep" aria-hidden="true">•</span>
+        <span class="gm-type gm-type--{{ item.food_type|lower }}">{% include "partials/_food_dot.html" %} {{ item.get_food_type_display }}</span>
+        {% if item.prep_time %}
+        <span class="gm-dot-sep" aria-hidden="true">•</span>
+        <span><i class="bi bi-clock" aria-hidden="true"></i> {{ item.prep_time }}</span>
+        {% endif %}
+    </p>
+
+    {% if item.description %}
+    <section class="gm-detail-block">
+        <h3>About this dish</h3>
+        <p>{{ item.description|linebreaksbr }}</p>
+    </section>
+    {% endif %}
+    {% if item.ingredients %}
+    <section class="gm-detail-block">
+        <h3>Ingredients</h3>
+        <p>{{ item.ingredients|linebreaksbr }}</p>
+    </section>
+    {% endif %}
+
+    {% if ordering %}
+    {% if item.is_available %}
+    {# hx-swap="none": the answer only updates the menu card and cart bar; the sheet closes itself #}
+    <form class="gm-detail-order" data-dish-form hx-post="{% url 'orders:cart_put' table.qr_token item.pk %}" hx-swap="none"
+          hx-disabled-elt="find button[type=submit]">
+        {% if item.sizes %}
+        <fieldset class="gm-sizes">
+            <legend>Choose a size</legend>
+            {% for p in item.sizes %}
+            <label class="gm-size">
+                <input type="radio" name="portion" value="{{ p.pk }}" data-price="{{ p.price }}"{% if forloop.first %} checked{% endif %}>
+                <span><strong>{{ p.name }}</strong><em>{{ p.price|inr_short }}</em></span>
+            </label>
+            {% endfor %}
+        </fieldset>
+        {% else %}
+        <span hidden data-base-price="{{ item.price }}"></span>
+        {% endif %}
+
+        <div class="gm-detail-buy">
+            <div class="gm-stepper gm-stepper--lg" role="group" aria-label="Quantity">
+                <button type="button" data-qty-step="-1" aria-label="One less"><i class="bi bi-dash" aria-hidden="true"></i></button>
+                <input type="number" name="qty" value="1" min="1" max="20" inputmode="numeric" aria-label="Quantity" readonly>
+                <button type="button" data-qty-step="1" aria-label="One more"><i class="bi bi-plus" aria-hidden="true"></i></button>
+            </div>
+            <button type="submit" class="gm-add-btn">
+                Add <span class="gm-add-total" data-total>{% if item.sizes %}{{ item.sizes.0.price|inr_short }}{% else %}{{ item.price|inr_short }}{% endif %}</span>
+            </button>
+        </div>
+        {% if item.cart_total %}<p class="gm-in-cart"><i class="bi bi-bag-check" aria-hidden="true"></i> {{ item.cart_total }} already in your order</p>{% endif %}
+    </form>
+    {% else %}
+    <p class="gm-detail-note"><i class="bi bi-emoji-frown" aria-hidden="true"></i> This dish has run out for today. Please choose another one.</p>
+    {% endif %}
+
+    {% else %}
+    {# public menu: prices only #}
+    {% if item.sizes %}
+    <ul class="gm-size-list">
+        {% for p in item.sizes %}<li><span>{{ p.name }}</span><strong>{{ p.price|inr_short }}</strong></li>{% endfor %}
+    </ul>
+    {% else %}
+    <p class="gm-detail-price">{{ item.price|inr_short }}</p>
+    {% endif %}
+    {% if takeaway_url %}<a class="gm-add-btn gm-add-btn--block" href="{{ takeaway_url }}"><i class="bi bi-bag" aria-hidden="true"></i> Order takeaway</a>{% endif %}
+    <p class="gm-detail-note"><i class="bi bi-qr-code-scan" aria-hidden="true"></i> Dining in? Scan the QR on your table to order.</p>
+    {% endif %}
+</div>

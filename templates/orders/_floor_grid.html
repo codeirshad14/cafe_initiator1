@@ -1,0 +1,105 @@
+{% load money %}
+{% comment %}
+The live part of the floor page: asks again every 10 seconds (and right after a
+booking is saved), with the same booking filter, and replaces itself.
+Today: the table tiles. This week / This month / Range: only the date-wise
+booking summary (orders/_booking_summary.html).
+{% endcomment %}
+<div id="floorGrid" class="floor" hx-get="{% url 'orders:floor' %}?{{ filter_query }}" hx-trigger="every 10s, rowsChanged from:body, liveChanged from:body" hx-swap="outerHTML">
+    {% if when != "today" %}
+    {% include "orders/_booking_summary.html" %}
+    {% else %}
+    <div class="floor-legend" role="list" aria-label="Table states">
+        <span class="legend-chip legend-free" role="listitem"><span class="legend-dot"></span> Free <strong>{{ free_count }}</strong></span>
+        <span class="legend-chip legend-reserved" role="listitem"><span class="legend-dot"></span> Booked <strong>{{ booked_count }}</strong></span>
+        <span class="legend-chip legend-occupied" role="listitem"><span class="legend-dot"></span> Occupied <strong>{{ occupied_count }}</strong></span>
+        <span class="legend-chip legend-billed" role="listitem"><span class="legend-dot"></span> Bill printed <strong>{{ billed_count }}</strong></span>
+
+        {# the counter: take-away parcels and home deliveries, one tap to their lists #}
+        {% if counter.is_active %}
+        <span class="legend-sep" aria-hidden="true"></span>
+        <a class="legend-chip legend-counter{% if takeaway_count %} has-orders{% endif %}" role="listitem" href="{% url 'orders:floor_table' counter.pk %}"
+           title="{% if takeaway_count %}{{ takeaway_count }} open take-away order{{ takeaway_count|pluralize }} · {{ takeaway_amount|inr_short }}{% else %}No open take-away orders{% endif %}">
+            <i class="bi bi-bag-check" aria-hidden="true"></i> {{ counter.name }} <strong>{{ takeaway_count }}</strong>
+            {% if takeaway_ready %}<span class="legend-alert" title="{{ takeaway_ready }} ready to hand over"><i class="bi bi-bell-fill" aria-hidden="true"></i> {{ takeaway_ready }}<span class="visually-hidden"> ready</span></span>{% endif %}
+        </a>
+        {% if delivery_enabled or delivery_count %}
+        <a class="legend-chip legend-counter legend-counter--delivery{% if delivery_count %} has-orders{% endif %}" role="listitem" href="{% url 'orders:deliveries' %}"
+           title="{% if delivery_count %}{{ delivery_count }} not delivered yet{% else %}No open deliveries{% endif %}">
+            <i class="bi bi-bicycle" aria-hidden="true"></i> Deliveries <strong>{{ delivery_count }}</strong>
+            {% if delivery_to_confirm %}<span class="legend-alert legend-alert--call" title="{{ delivery_to_confirm }} to confirm by phone"><i class="bi bi-telephone-fill" aria-hidden="true"></i> {{ delivery_to_confirm }}<span class="visually-hidden"> to confirm by phone</span></span>{% endif %}
+        </a>
+        {% endif %}
+        {% endif %}
+
+        {% if bookings_today %}<a class="legend-chip legend-booked" role="listitem" href="{% url 'tables:booking_list' %}"><i class="bi bi-calendar-check" aria-hidden="true"></i> Bookings today <strong>{{ bookings_today }}</strong></a>{% endif %}
+        <span class="floor-updated" aria-hidden="true"><span class="live-dot"></span> Live · {% now "h:i A" %}</span>
+    </div>
+
+    {% if tables %}
+    {% regroup tables by section as sections %}
+    {% for group in sections %}
+    <section class="floor-section" data-search-group>
+        {% if group.grouper or sections|length > 1 %}<h2 class="floor-section-title">{{ group.grouper|default:"Other tables" }}</h2>{% endif %}
+        <div class="floor-grid">
+            {% for t in group.list %}
+            {% comment %}
+            Where a tap goes:
+              booked now (red) -> the booking: "Guests arrived" seats them, then their order
+              no order yet (free, even with a booking later today) -> the order screen (POS style),
+                for those who take orders
+              otherwise -> the table's page
+            data-search: what the search box looks in (static/js/filter.js).
+            {% endcomment %}
+            <a class="table-tile tile-{{ t.state }}"
+               {% if t.state == "booked" %}href="{% url 'tables:booking_list' %}" hx-get="{% url 'tables:booking_arrive' t.booking.pk %}" hx-target="#panel" hx-swap="innerHTML"
+               {% elif not t.running and can_take_order %}href="{% url 'orders:waiter_order' t.pk %}"
+               {% else %}href="{% url 'orders:floor_table' t.pk %}"{% endif %}
+               data-search="{{ t.name|lower }} {{ t.section|lower }} {{ t.booking.customer_name|lower }} {{ t.booking.customer_phone }} {% for o in t.running %}{{ o.customer_name|lower }} {% endfor %}"
+               aria-label="{{ t.label }}: {% if t.state == 'free' %}free{% if t.booking %}, booked later at {{ t.booking.time|time:'g:i A' }}{% endif %}{% elif t.state == 'booked' %}booked for {{ t.booking.time|time:'g:i A' }}{% elif t.state == 'billed' %}bill printed{% else %}occupied{% endif %}">
+                <div class="tile-top">
+                    <strong class="tile-name">{{ t.name }}</strong>
+                    {% if t.running and t.ready_count %}
+                    <span class="tile-alert" title="{{ t.ready_count }} round{{ t.ready_count|pluralize }} ready to serve"><i class="bi bi-bell-fill" aria-hidden="true"></i> {{ t.ready_count }}</span>
+                    {% endif %}
+                </div>
+                {% if t.state == "booked" %}
+                {# booked now (from an hour before its time): date, time and guest #}
+                <span class="tile-state">Booked{% if t.more_bookings > 0 %} <span class="tile-more" title="{{ t.more_bookings }} more booking{{ t.more_bookings|pluralize }} later today">+{{ t.more_bookings }}</span>{% endif %}</span>
+                <span class="tile-when">
+                    <span><i class="bi bi-calendar-event" aria-hidden="true"></i> {% if t.booking.date == today %}Today, {{ t.booking.date|date:"j M" }}{% else %}Since {{ t.booking.date|date:"D j M" }}{% endif %}</span>
+                    <span><i class="bi bi-clock" aria-hidden="true"></i> {{ t.booking.time|time:"g:i A" }} – {% if t.booking.is_multi_day %}{{ t.booking.end_date|date:"j M" }}, {% endif %}{{ t.booking.end_time|time:"g:i A" }}</span>
+                </span>
+                <small class="tile-meta" title="{{ t.booking.customer_name }}, {{ t.booking.guests }} guests"><i class="bi bi-person" aria-hidden="true"></i> {{ t.booking.customer_name }} · {{ t.booking.guests }}</small>
+                {% elif t.state == "free" %}
+                <span class="tile-state">Free</span>
+                {# booked later today: still free now, with a note #}
+                {% if t.booking %}<span class="tile-later" title="{{ t.booking.customer_name }}, {{ t.booking.guests }} guests{% if t.more_bookings > 0 %}, and {{ t.more_bookings }} more booking{{ t.more_bookings|pluralize }} later{% endif %}"><i class="bi bi-calendar-event" aria-hidden="true"></i> Booked {{ t.booking.time|time:"g:i A" }}{% if t.more_bookings > 0 %} <span class="tile-later-more">+{{ t.more_bookings }}</span>{% endif %}</span>{% endif %}
+                <small class="tile-meta"><i class="bi bi-people" aria-hidden="true"></i> {{ t.capacity }} seats</small>
+                {% else %}
+                <span class="tile-state">{% if t.state == "billed" %}Bill printed{% elif t.running|length > 1 %}{{ t.running|length }} bills{% else %}Order #{{ t.running.0.order_no }}{% endif %}</span>
+                <strong class="tile-amount">{{ t.amount|inr_short }}</strong>
+                <small class="tile-meta">
+                    <i class="bi bi-clock" aria-hidden="true"></i> <span class="text-nowrap">{{ t.minutes|duration }}</span>
+                    {# the kitchen's progress, live: sent -> cooking -> ready (the bell above) #}
+                    {% if t.new_count %}· <span class="text-nowrap" title="Sent, the kitchen has not started"><i class="bi bi-hourglass-split" aria-hidden="true"></i> {{ t.new_count }} sent</span>{% endif %}
+                    {% if t.cooking_count %}· <span class="text-nowrap"><i class="bi bi-fire" aria-hidden="true"></i> {{ t.cooking_count }} cooking</span>{% endif %}
+                    {% if t.ready_count %}· <span class="text-nowrap"><i class="bi bi-check2-circle" aria-hidden="true"></i> {{ t.ready_count }} ready</span>{% endif %}
+                </small>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    {% else %}
+    <section class="panel">
+        <div class="empty-state">
+            <span class="empty-icon"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i></span>
+            <h3>No tables yet</h3>
+            <p>An admin or manager adds tables on the Tables &amp; QR page.</p>
+        </div>
+    </section>
+    {% endif %}
+    {% endif %}
+</div>

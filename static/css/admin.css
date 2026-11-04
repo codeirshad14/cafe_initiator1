@@ -1,0 +1,51 @@
+/* The Django admin (Jazzmin, resto/settings.py JAZZMIN_SETTINGS): the app's own red
+   instead of AdminLTE's, so the admin looks like the rest of Mr Cafe. */
+:root {
+  --mc-brand: #da3831;
+  --mc-brand-dark: #c22c26;
+}
+
+.btn-primary,
+.btn-primary:disabled {
+  background-color: var(--mc-brand);
+  border-color: var(--mc-brand);
+}
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: var(--mc-brand-dark) !important;
+  border-color: var(--mc-brand-dark) !important;
+}
+.navbar-danger,
+.bg-danger,
+.sidebar-dark-danger .nav-sidebar > .nav-item > .nav-link.active {
+  background-color: var(--mc-brand) !important;
+}
+a,
+.page-link {
+  color: var(--mc-brand-dark);
+}
+.page-item.active .page-link {
+  background-color: var(--mc-brand);
+  border-color: var(--mc-brand);
+}
+
+/* the logo: a rounded square, not AdminLTE's circle; on the login page a modest size */
+.brand-link .brand-image {
+  width: 33px;
+  height: 33px;
+  border-radius: 8px;
+  box-shadow: none !important;
+}
+.login-logo img {
+  width: 72px;
+  height: 72px;
+}
+
+/* Restaurants list: the columns edited right in the list */
+.field-tier select {
+  min-width: 130px;
+}
+.field-max_users input {
+  width: 72px;
+}

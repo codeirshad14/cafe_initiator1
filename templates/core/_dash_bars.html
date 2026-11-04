@@ -1,0 +1,29 @@
+{% load money %}
+{% comment %}
+One dashboard panel of horizontal bars: rows [{"label", "total", "share", "count"?}].
+The bar shows the share of the biggest row; the figure is always written next to it.
+    {% include "core/_dash_bars.html" with title="Payment modes" sub="..." rows=modes count_word="bill" searchable=True %}
+{% endcomment %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h3 class="panel-title">{{ title }}</h3>
+            <p class="panel-sub">{{ sub }}</p>
+        </div>
+    </div>
+    <div class="panel-body">
+        {% if rows %}
+        <ul class="hbar-list">
+            {% for row in rows %}
+            <li title="{{ row.label }}: {{ row.total|inr }}{% if count_word %}, {{ row.count }} {{ count_word }}{{ row.count|pluralize }}{% endif %}"{% if searchable %} data-search="{{ row.label|lower }}"{% endif %}>
+                <span class="hbar-label">{{ row.label }}{% if count_word %} <small>{{ row.count }}</small>{% endif %}</span>
+                <span class="hbar-track" aria-hidden="true"><span class="hbar-fill" style="width: {{ row.share }}%"></span></span>
+                <span class="hbar-value">{{ row.total|inr_short }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="dash-empty">Nothing in this period yet.</p>
+        {% endif %}
+    </div>
+</section>

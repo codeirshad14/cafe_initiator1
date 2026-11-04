@@ -1,0 +1,61 @@
+{% if staff_members %}
+<div class="table-wrap table-scroll">
+    <table class="data-table table-stack">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Works at</th>
+                <th>Phone</th>
+                <th>Last login</th>
+                <th>Status</th>
+                <th class="text-end"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in staff_members %}
+            <tr>
+                <td class="cell-main">
+                    <div class="person">
+                        <span class="avatar">{{ s.initials }}</span>
+                        <div class="min-w-0">
+                            <strong class="truncate">{{ s.name }}{% if s.pk == current_staff.pk %} <span class="you-tag">you</span>{% endif %}</strong>
+                            <small class="truncate">{{ s.user.email|default:s.user.username }}</small>
+                        </div>
+                    </div>
+                </td>
+                <td data-label="Role"><span class="role-pill role-{{ s.role|lower }}">{{ s.get_role_display }}</span></td>
+                <td data-label="Works at">{% if s.works_everywhere %}Every location{% else %}{{ s.allowed_locations|join:", " }}{% endif %}</td>
+                <td data-label="Phone">{{ s.phone|default:"—" }}</td>
+                <td data-label="Last login" class="text-body-secondary">{{ s.user.last_login|date:"d M Y, h:i A"|default:"Never" }}</td>
+                <td data-label="Status">
+                    {% if s.is_active %}
+                    <span class="status-badge status-success">Active</span>
+                    {% else %}
+                    <span class="status-badge status-muted">Turned off</span>
+                    {% endif %}
+                </td>
+                <td class="cell-actions text-end">
+                    {# only the admin changes the admin login #}
+                    {% if s.role != "ADMIN" or current_staff.role == "ADMIN" %}
+                    <button class="btn btn-sm btn-light btn-icon" type="button" title="Edit {{ s.name }}"
+                            aria-label="Edit {{ s.name }}"
+                            hx-get="{% url 'core:staff_edit' s.pk %}" hx-target="#panel">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% url 'core:staff_rows' as rows_url %}
+{% include "partials/_pager.html" with target="#staffRows" include="#staffFilters" what="staff members" one="staff member" %}
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+    <h3>No staff found</h3>
+    <p>Try another search or role, or add a new staff member.</p>
+</div>
+{% endif %}

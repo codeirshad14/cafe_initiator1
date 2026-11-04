@@ -1,0 +1,66 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Staff{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><span>Staff</span>{% endblock %}
+{% block page_title %}Staff{% endblock %}
+
+{% block page_actions %}
+{% include "core/_login_usage.html" %}
+{# loads the add form into the side panel #}
+<button class="btn btn-primary" type="button" hx-get="{% url 'core:staff_add' %}" hx-target="#panel">
+    <i class="bi bi-person-plus" aria-hidden="true"></i> Add staff
+</button>
+{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="staff" %}
+<section class="panel">
+    {# any change in this form reloads only the table, 300ms after typing stops #}
+    <form id="staffFilters" class="panel-toolbar" role="search"
+          hx-get="{% url 'core:staff_rows' %}" hx-target="#staffRows" hx-trigger="input delay:300ms, submit">
+        <div class="search-box">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input type="search" name="q" class="form-control" placeholder="Search name, email or phone…"
+                   aria-label="Search staff" autocomplete="off">
+        </div>
+        <select name="role" class="form-select toolbar-select" aria-label="Filter by role">
+            <option value="">All roles</option>
+            {% for value, label in roles %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {# reloads itself after a save (the "rowsChanged" event), keeping the filters #}
+    <div id="staffRows" hx-get="{% url 'core:staff_rows' %}" hx-trigger="rowsChanged from:body" hx-include="#staffFilters, #staffRows [name=page]">
+        {% include "core/_staff_rows.html" %}
+    </div>
+</section>
+
+{# what each role may do (core/roles.py) #}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="panel-title">Who can do what</h2>
+            <p class="panel-sub">Every login works at its own locations; admin and manager at all of them.</p>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table role-matrix">
+            <thead>
+                <tr><th>Screen</th>{% for name in matrix.roles %}<th class="text-center">{{ name }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for row in matrix.rows %}
+                <tr>
+                    <td>{{ row.what }}</td>
+                    {% for allowed in row.cells %}
+                    <td class="text-center">{% if allowed %}<i class="bi bi-check-circle-fill role-yes" aria-label="Yes"></i>{% else %}<span class="role-no" aria-label="No">—</span>{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

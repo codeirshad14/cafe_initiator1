@@ -1,0 +1,24 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+<p class="form-section">Person</p>
+{% include "partials/_field.html" with field=form.name %}
+{% include "partials/_field.html" with field=form.phone %}
+{% include "partials/_field.html" with field=form.role %}
+{% if form.locations %}
+{# more than one location: where this person works #}
+<div class="field-block{% if form.locations.errors %} has-error{% endif %}">
+    <span class="form-label">{{ form.locations.label }}</span>
+    <div class="check-list">
+        {% for box in form.locations %}<label class="form-check">{{ box.tag }} <span class="form-check-label">{{ box.choice_label }}</span></label>{% endfor %}
+    </div>
+    <div class="form-text">{{ form.locations.help_text }}</div>
+    {% for error in form.locations.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<p class="form-section">Login</p>
+{% include "partials/_field.html" with field=form.email %}
+{% include "partials/_field.html" with field=form.password %}
+{% include "partials/_field.html" with field=form.is_active %}
+{% endblock %}

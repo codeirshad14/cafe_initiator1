@@ -1,0 +1,73 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Tables & QR{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><span>Tables &amp; QR</span>{% endblock %}
+{% block page_title %}Tables &amp; QR codes{% endblock %}
+
+{% block page_actions %}
+{% if not current_restaurant.menu_only %}
+<a class="btn btn-light" href="{% url 'tables:qr_sheet' %}" target="_blank" rel="noopener">
+    <i class="bi bi-printer" aria-hidden="true"></i> Print QR sheet
+</a>
+<button class="btn btn-primary" type="button" hx-get="{% url 'tables:table_add' %}" hx-target="#panel">
+    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add table
+</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{# the restaurant's own menus: one to order takeaway / delivery, one to look at only (Only Menu: that one alone) #}
+<section class="panel menu-qr-panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="panel-title">{% if current_restaurant.menu_only %}Menu QR code{% else %}Menu QR codes{% endif %}</h2>
+            <p class="panel-sub">{% if current_restaurant.menu_only %}Put it on the tables, the wall or the door: guests scan it to see your menu.{% else %}Besides each table's QR. Both open the same menu as the tables.{% endif %}</p>
+        </div>
+        <a class="btn btn-sm btn-light" href="{% url 'tables:qr_sheet' %}?menus=1" target="_blank" rel="noopener">
+            <i class="bi bi-printer" aria-hidden="true"></i> {% if current_restaurant.menu_only %}Print{% else %}Print both{% endif %}
+        </a>
+    </div>
+    <div class="menu-qr-grid">
+        {% for m in menu_qrs %}
+        <article class="menu-qr-card">
+            <a class="menu-qr-code" href="{% url 'tables:menu_qr' m.kind %}?download=1" title="Download this QR code">
+                <img src="{% url 'tables:menu_qr' m.kind %}" alt="QR code of the {{ m.title|lower }}" width="112" height="112" loading="lazy">
+            </a>
+            <div class="menu-qr-text">
+                <h3><i class="bi bi-{{ m.icon }}" aria-hidden="true"></i> {{ m.title }}</h3>
+                <p>{{ m.text }}</p>
+                <div class="menu-qr-actions">
+                    <a class="btn btn-sm btn-light" href="{% url 'tables:menu_qr' m.kind %}?download=1"><i class="bi bi-download" aria-hidden="true"></i> QR</a>
+                    {# the printable card: the cafe's name, the QR, "{{ m.label }}" (tables/qr_card.py) #}
+                    <a class="btn btn-sm btn-light" href="{% url 'tables:menu_qr' m.kind %}?download=1&amp;card=1" title="A small printable card: {{ m.label }}"><i class="bi bi-postcard" aria-hidden="true"></i> QR + label</a>
+                    <button class="btn btn-sm btn-light" type="button" data-copy="{{ m.url }}" title="{{ m.url }}"><i class="bi bi-link-45deg" aria-hidden="true"></i> Copy link</button>
+                    <a class="btn btn-sm btn-light" href="{{ m.url }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open</a>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% if not current_restaurant.menu_only %}
+<section class="panel">
+    <form id="tableFilters" class="panel-toolbar" role="search"
+          hx-get="{% url 'tables:table_rows' %}" hx-target="#tableCards" hx-trigger="input delay:300ms, submit">
+        <div class="search-box">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input type="search" name="q" class="form-control" placeholder="Search tables…" aria-label="Search tables" autocomplete="off">
+        </div>
+        {% if sections %}
+        <select name="section" class="form-select toolbar-select" aria-label="Filter by section">
+            <option value="">All sections</option>
+            {% for s in sections %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        {% endif %}
+    </form>
+
+    <div id="tableCards" hx-get="{% url 'tables:table_rows' %}" hx-trigger="rowsChanged from:body" hx-include="#tableFilters">
+        {% include "tables/_table_cards.html" %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

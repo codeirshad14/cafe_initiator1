@@ -1,0 +1,27 @@
+{% extends "base_staff.html" %}
+{% load static %}
+
+{% block title %}Bookings{% endblock %}
+{% block crumbs %}<span>/</span><span>Service</span><span>/</span><span>Bookings</span>{% endblock %}
+{% block page_title %}Table bookings{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-booking" type="button" hx-get="{% url 'tables:booking_add' %}?day={{ start|date:'Y-m-d' }}" hx-target="#panel">
+    <i class="bi bi-calendar-plus" aria-hidden="true"></i> New booking
+</button>
+{% endblock %}
+
+{% block content %}
+{% if not request.user.staff.restaurant.booking_enabled %}
+<div class="alert alert-warning">Bookings are switched off, so the public menu does not offer them. An admin can switch them on in <strong>Restaurant</strong> settings.</div>
+{% endif %}
+{# the same filter row as the Floor: Today (default), This week, This month, Range; and a search #}
+{% url 'tables:booking_list' as filter_url %}
+{% include "partials/_period_filter.html" with filter_target="#bookingRows" search_placeholder="Search guest, mobile or table…" %}
+
+{% include "tables/_booking_rows.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/filter.js' %}"></script>
+{% endblock %}

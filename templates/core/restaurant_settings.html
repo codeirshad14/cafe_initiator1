@@ -1,0 +1,120 @@
+{% extends "base_staff.html" %}
+{% load money %}
+
+{% block title %}Cafe profile{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><span>Cafe profile</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% block page_actions %}
+<a class="btn btn-light" href="{% url 'orders:public_menu' restaurant.slug %}" target="_blank" rel="noopener">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> View public menu
+</a>
+{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="profile" %}
+<div class="split-grid">
+    <form method="post" enctype="multipart/form-data" class="panel" novalidate>
+        {% csrf_token %}
+        <div class="panel-head"><h2 class="panel-title">Details</h2></div>
+        <div class="panel-body">
+            {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            {% include "partials/_field.html" with field=form.name %}
+            {% include "partials/_field.html" with field=form.address %}
+            <div class="field-row">
+                {% include "partials/_field.html" with field=form.phone %}
+                {% include "partials/_field.html" with field=form.email %}
+            </div>
+
+            <p class="form-section">Tax &amp; licence</p>
+            <div class="field-row">
+                {% include "partials/_field.html" with field=form.gstin %}
+                {% include "partials/_field.html" with field=form.gst_percent %}
+            </div>
+            {% include "partials/_field.html" with field=form.fssai_no %}
+
+            <p class="form-section">Logo</p>
+            {% if restaurant.logo %}
+            <div class="photo-current photo-current--logo">
+                <img src="{{ restaurant.logo.url }}" alt="Current logo of {{ restaurant.name }}">
+                <span>Current logo. Choose a new file to replace it.</span>
+            </div>
+            {% endif %}
+            {% include "partials/_field.html" with field=form.logo %}
+            {% if form.remove_logo %}{% include "partials/_field.html" with field=form.remove_logo %}{% endif %}
+
+            <p class="form-section">Delivery &amp; bookings</p>
+            {% include "partials/_field.html" with field=form.delivery_enabled %}
+            <div class="field-row">
+                {% include "partials/_field.html" with field=form.delivery_charge %}
+                {% include "partials/_field.html" with field=form.free_delivery_above %}
+            </div>
+            {% include "partials/_field.html" with field=form.booking_enabled %}
+
+            <p class="form-section">Public menu slider</p>
+            <p class="form-hint">Slide 1 is always your restaurant: name, address and logo. Add up to three photos after it (offers, your place, signature dishes). They slide by themselves.</p>
+            {% for slot in form.slide_slots %}
+            <div class="slide-slot">
+                <h3 class="slide-slot-title">Slide {{ slot.number }}</h3>
+                {% if slot.current %}
+                <div class="photo-current photo-current--wide">
+                    <img src="{{ slot.current.url }}" alt="Current slide {{ slot.number }}">
+                    <span>Current photo. Choose a new file to replace it.</span>
+                </div>
+                {% endif %}
+                {% include "partials/_field.html" with field=slot.photo %}
+                {% include "partials/_field.html" with field=slot.text %}
+                {% if slot.remove %}{% include "partials/_field.html" with field=slot.remove %}{% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2" aria-hidden="true"></i> Save details</button>
+        </div>
+    </form>
+
+    <aside class="bill-side">
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">Public menu</h2>
+                    <p class="panel-sub">Anyone can see it and order take-away from it. Share it on WhatsApp, Instagram or Google Maps. Dine-in orders still need the table's QR code.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" value="{{ public_menu_url }}" readonly aria-label="Public menu address">
+                    <button type="button" class="btn btn-light" data-copy="{{ public_menu_url }}"><i class="bi bi-copy" aria-hidden="true"></i> Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">Membership</h2>
+                    <p class="panel-sub">Set by us. Contact us to renew, upgrade or allow more logins.</p>
+                </div>
+                {% if restaurant.membership_active %}<span class="status-badge status-success">Active</span>{% else %}<span class="status-badge status-danger">Ended</span>{% endif %}
+            </div>
+            <div class="panel-body">
+                <dl class="info-list info-list--tight">
+                    <div><dt>Membership type</dt><dd>{{ restaurant.get_tier_display }}</dd></div>
+                    <div><dt>Plan</dt><dd>{{ restaurant.get_plan_display }}</dd></div>
+                    <div><dt>Days left</dt><dd>{{ restaurant.membership_days_left }}</dd></div>
+                    {% if not restaurant.menu_only %}
+                    {% with usage=restaurant.plan_usage %}
+                    <div><dt>Bills this year</dt><dd>{{ usage.bills|indian }}{% if usage.limit %} of {{ usage.limit|indian }}{% else %} (no limit){% endif %}</dd></div>
+                    <div><dt>Bill year</dt><dd>{{ usage.start|date:"d M Y" }} – {{ usage.end|date:"d M Y" }}</dd></div>
+                    {% endwith %}
+                    <div><dt>Locations allowed</dt><dd>{{ restaurant.location_limit|default:"No limit" }}</dd></div>
+                    {% endif %}
+                    <div><dt>From</dt><dd>{{ restaurant.membership_start|date:"d M Y" }}</dd></div>
+                    <div><dt>Valid till</dt><dd>{{ restaurant.membership_end|date:"d M Y" }}</dd></div>
+                    <div><dt>Logins allowed</dt><dd>{{ restaurant.max_users }}</dd></div>
+                    <div><dt>Logins in use</dt><dd>{{ restaurant.active_users }}</dd></div>
+                </dl>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

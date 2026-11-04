@@ -1,0 +1,16 @@
+{% extends "base_customer.html" %}
+
+{% block title %}Booking #{{ booking.booking_no }} · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page{% endblock %}
+
+{% block header %}
+{% url 'orders:public_menu' restaurant.slug as menu_url %}
+{% include "orders/_customer_header.html" with back_url=menu_url title="Your booking" subtitle=restaurant.name %}
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-wrap--narrow gm-cart-page">
+    {% include "tables/_booking_status.html" %}
+    <a class="gm-add-more" href="{% url 'orders:public_menu' restaurant.slug %}"><i class="bi bi-journal-text" aria-hidden="true"></i> See the menu</a>
+</div>
+{% endblock %}

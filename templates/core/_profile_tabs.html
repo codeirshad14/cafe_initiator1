@@ -1,0 +1,23 @@
+{% comment %}
+Cafe profile tabs (admin and manager: roles.COMPANY). Usage: {% include "core/_profile_tabs.html" with tab="bill" %}
+{% endcomment %}
+<nav class="profile-tabs" aria-label="Cafe profile">
+    <a href="{% url 'core:restaurant_settings' %}" class="profile-tab{% if tab == 'profile' %} is-active{% endif %}"{% if tab == 'profile' %} aria-current="page"{% endif %}>
+        <i class="bi bi-shop" aria-hidden="true"></i> Profile
+    </a>
+    <a href="{% url 'core:bill_settings' %}" class="profile-tab{% if tab == 'bill' %} is-active{% endif %}"{% if tab == 'bill' %} aria-current="page"{% endif %}>
+        <i class="bi bi-receipt" aria-hidden="true"></i> Bill &amp; print
+    </a>
+    <a href="{% url 'core:location_list' %}" class="profile-tab{% if tab == 'locations' %} is-active{% endif %}"{% if tab == 'locations' %} aria-current="page"{% endif %}>
+        <i class="bi bi-geo-alt" aria-hidden="true"></i> Locations
+    </a>
+    <a href="{% url 'billing:offer_list' %}" class="profile-tab{% if tab == 'offers' %} is-active{% endif %}"{% if tab == 'offers' %} aria-current="page"{% endif %}>
+        <i class="bi bi-stars" aria-hidden="true"></i> Offers
+    </a>
+    <a href="{% url 'core:printers' %}" class="profile-tab{% if tab == 'printers' %} is-active{% endif %}"{% if tab == 'printers' %} aria-current="page"{% endif %}>
+        <i class="bi bi-printer" aria-hidden="true"></i> Printers
+    </a>
+    <a href="{% url 'core:staff_list' %}" class="profile-tab{% if tab == 'staff' %} is-active{% endif %}"{% if tab == 'staff' %} aria-current="page"{% endif %}>
+        <i class="bi bi-people" aria-hidden="true"></i> Staff
+    </a>
+</nav>

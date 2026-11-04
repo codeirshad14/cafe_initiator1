@@ -1,0 +1,5 @@
+{# a change against the period before: arrow + word + number, never colour alone. up_is_bad: e.g. discounts #}
+{% if value is None %}<span class="delta delta-flat">no earlier figures</span>
+{% elif value > 0 %}<span class="delta {% if up_is_bad %}delta-down{% else %}delta-up{% endif %}"><i class="bi bi-arrow-up-right" aria-hidden="true"></i> up {{ value }}%</span>
+{% elif value < 0 %}<span class="delta {% if up_is_bad %}delta-up{% else %}delta-down{% endif %}"><i class="bi bi-arrow-down-right" aria-hidden="true"></i> down {{ value|stringformat:"d"|cut:"-" }}%</span>
+{% else %}<span class="delta delta-flat">same as before</span>{% endif %}

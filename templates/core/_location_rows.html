@@ -1,0 +1,38 @@
+<div class="table-wrap table-scroll">
+    <table class="data-table table-stack">
+        <thead>
+            <tr>
+                <th>Location</th>
+                <th class="num">Tables</th>
+                <th class="num">Staff mapped</th>
+                <th class="num">Orders today</th>
+                <th>State</th>
+                <th class="text-end"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for place in locations %}
+            <tr>
+                <td class="cell-main">
+                    <strong>{{ place.name }}</strong>{% if forloop.first and pager.start <= 1 %} <span class="you-tag">main</span>{% endif %}
+                    {% if place == current_location %} <span class="status-badge status-brand">You are here</span>{% endif %}
+                    {% if place.address %}<br><small class="text-body-secondary">{{ place.address|truncatechars:60 }}</small>{% endif %}
+                </td>
+                <td data-label="Tables" class="num">{{ place.table_count }}</td>
+                <td data-label="Staff mapped" class="num">{{ place.staff_count }}</td>
+                <td data-label="Orders today" class="num">{{ place.orders_today }}</td>
+                <td data-label="State">
+                    {% if place.is_active %}<span class="status-badge status-success">Open</span>
+                    {% else %}<span class="status-badge status-muted">Closed</span>{% endif %}
+                </td>
+                <td class="cell-actions text-end">
+                    <button class="btn btn-sm btn-light btn-icon" type="button" title="Edit" aria-label="Edit {{ place.name }}"
+                            hx-get="{% url 'core:location_edit' place.pk %}" hx-target="#panel"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% url 'core:location_rows' as rows_url %}
+{% include "partials/_pager.html" with target="#locationRows" what="locations" one="location" %}

@@ -1,0 +1,40 @@
+{% comment %}
+One booking on the Bookings page: time, guest, guests, table, status and the
+next steps. Its buttons send the page's period along (hx-include of the filter
+row, #periodFilter), so the list comes back for the same days.
+data-search: the filter row's search (static/js/filter.js).
+{% endcomment %}
+<article class="booking-row booking-row--{{ b.status|lower }}"
+         data-search="{{ b.customer_name|lower }} {{ b.customer_phone }} {{ b.table.name|lower }}">
+    {% include "tables/_booking_when.html" %}
+    <div class="booking-who">
+        <strong>{{ b.customer_name }} <small>· {{ b.guests }} guest{{ b.guests|pluralize }}</small></strong>
+        <small><a href="tel:{{ b.customer_phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ b.customer_phone }}</a>
+            · #{{ b.booking_no }} · {{ b.get_source_display }}{% if b.note %} · <i class="bi bi-chat-left-text" aria-hidden="true"></i> {{ b.note }}{% endif %}</small>
+    </div>
+    <div class="booking-table">
+        {% if b.table %}<span class="status-badge status-muted">{{ b.table.label }}</span>{% elif b.is_upcoming %}<span class="status-badge status-danger">No table yet</span>{% endif %}
+        <span class="status-badge {% if b.status == 'REQUESTED' %}status-warning{% elif b.status == 'CONFIRMED' %}status-success{% elif b.status == 'SEATED' %}status-info{% else %}status-muted{% endif %}">{{ b.get_status_display }}</span>
+    </div>
+    <div class="booking-actions">
+        {% if b.status == "REQUESTED" %}
+        <button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'tables:booking_step' b.pk 'confirm' %}" hx-target="#bookingRows" hx-include="#periodFilter">
+            <i class="bi bi-check2" aria-hidden="true"></i> Confirm</button>
+        {% endif %}
+        {% if b.is_upcoming %}
+        <button type="button" class="btn btn-sm btn-light" hx-post="{% url 'tables:booking_step' b.pk 'seated' %}" hx-target="#bookingRows" hx-include="#periodFilter">Seated</button>
+        <button type="button" class="btn btn-sm btn-light" hx-get="{% url 'tables:booking_edit' b.pk %}" hx-target="#panel" hx-swap="innerHTML">{% if b.table %}Edit{% else %}Give table{% endif %}</button>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-light btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More for booking {{ b.booking_no }}"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><button class="dropdown-item" type="button" hx-post="{% url 'tables:booking_step' b.pk 'noshow' %}" hx-target="#bookingRows" hx-include="#periodFilter">No-show</button></li>
+                <li><button class="dropdown-item text-danger" type="button" hx-get="{% url 'tables:booking_cancel' b.pk %}" hx-target="#panel" hx-swap="innerHTML">Cancel booking</button></li>
+            </ul>
+        </div>
+        {% elif b.status == "SEATED" and b.table %}
+        <a class="btn btn-sm btn-light" href="{% url 'orders:floor_table' b.table.pk %}">Open {{ b.table.label }}</a>
+        {% elif b.cancel_reason %}
+        <small class="text-secondary">{{ b.cancel_reason }}</small>
+        {% endif %}
+    </div>
+</article>

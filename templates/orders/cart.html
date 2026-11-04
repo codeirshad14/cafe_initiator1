@@ -1,0 +1,105 @@
+{% extends "base_customer.html" %}
+{% load money %}{# inr, inr_short #}
+
+{% block title %}Your order · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page gm-page--ordering{% endblock %}
+
+{% block header %}
+{% include "orders/_customer_header.html" with back_url=menu_url title="Your order" %}
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-wrap--narrow gm-cart-page">
+    {% if error %}
+    <div class="c-notice c-notice--error gm-notice" role="alert">
+        <i class="bi bi-exclamation-circle" aria-hidden="true"></i><span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    {% if cart.lines %}
+    {# the dishes: photo, name, prep time, − 1 +, price, delete #}
+    <section class="gm-card gm-cart" id="cartLines" hx-sync="this:queue all" aria-label="Dishes in your order">
+        {% include "orders/_cart_lines.html" %}
+    </section>
+    <a class="gm-add-more" href="{{ menu_url }}"><i class="bi bi-plus-circle" aria-hidden="true"></i> Add more dishes</a>
+
+    <form method="post" action="{% url 'orders:order_place' table.qr_token %}" class="gm-card gm-details" id="placeForm" data-submit-once novalidate>
+        {% csrf_token %}
+        <h2 class="gm-block-title">Other details</h2>
+
+        {% if not table.is_takeaway %}
+        <div class="gm-info-row">
+            <span>Your table</span>
+            <strong>{{ table.label }}{% if table.section %} · {{ table.section }}{% endif %}</strong>
+        </div>
+        {% endif %}
+
+        {% if form.order_type.field.widget.input_type == "hidden" %}
+        {# only one way left (the counter without delivery): always a parcel #}
+        {{ form.order_type }}
+        <div class="gm-info-row">
+            <span>Order type</span>
+            <strong><i class="bi bi-bag-check" aria-hidden="true"></i> Take away</strong>
+        </div>
+        <p class="gm-small-note"><i class="bi bi-info-circle" aria-hidden="true"></i> We pack it for you to collect at the counter.</p>
+        {% else %}
+        <fieldset class="c-type">
+            <legend class="visually-hidden">How would you like it?</legend>
+            <div class="c-type-grid">
+                {% for choice in form.order_type %}
+                <label class="c-type-option">
+                    {{ choice.tag }}
+                    <span>
+                        <i class="bi {% if choice.data.value == 'TAKEAWAY' %}bi-bag{% elif choice.data.value == 'DELIVERY' %}bi-bicycle{% else %}bi-cup-hot{% endif %}" aria-hidden="true"></i>
+                        <strong>{{ choice.choice_label }}</strong>
+                        <small>{% if choice.data.value == 'TAKEAWAY' %}Packed to take with you{% elif choice.data.value == 'DELIVERY' %}Brought to your door{% else %}Served at your table{% endif %}</small>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        {% endif %}
+
+        {% include "orders/_bill_choice.html" %}
+
+        {# data-show-for: shown only for those order types (static/js/app.js) #}
+        <div class="c-notice c-notice--info gm-notice gm-delivery-note" data-show-for="DELIVERY" role="note">
+            <i class="bi bi-telephone" aria-hidden="true"></i>
+            <span>
+                We will <strong>call you to confirm</strong> before we start cooking. Pay the rider on delivery (cash or UPI).
+                {% if restaurant.delivery_charge %}Delivery charge {{ restaurant.delivery_charge|inr_short }}{% if restaurant.free_delivery_above %}, free for orders of {{ restaurant.free_delivery_above|inr_short }} or more{% endif %}.{% else %}Free delivery.{% endif %}
+            </span>
+        </div>
+
+        {% include "partials/_field.html" with field=form.customer_name %}
+        {% include "partials/_field.html" with field=form.customer_phone %}
+        <div data-show-for="TAKEAWAY DELIVERY">
+            {% include "partials/_field.html" with field=form.customer_address %}
+        </div>
+        {% include "partials/_field.html" with field=form.note %}
+        <p class="gm-small-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Prices are before GST. Taxes are added on the final bill.</p>
+    </form>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-bag" aria-hidden="true"></i></span>
+        <h3>Your cart is empty</h3>
+        <a class="btn btn-primary" href="{{ menu_url }}">Back to the menu</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block bottom %}
+{% if cart.lines %}
+<div class="gm-place-bar">
+    <div class="gm-place-total">
+        <small>Total</small>
+        <strong id="placeTotal">{{ cart.total|inr }}</strong>
+    </div>
+    <button type="submit" form="placeForm" class="gm-add-btn" id="placeButton">
+        Place order <i class="bi bi-arrow-right" aria-hidden="true"></i>
+    </button>
+</div>
+{% endif %}
+{% endblock %}
+

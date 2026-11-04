@@ -1,0 +1,83 @@
+{% load static money %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bill #{{ bill.bill_no }} · {{ restaurant.name }}</title>
+    <link href="{% static 'css/app.css' %}" rel="stylesheet">
+</head>
+{# 80 mm thermal bill #}
+<body class="print-80">
+<div class="print-tools">
+    <button type="button" onclick="window.print()">Print again</button>
+    <button type="button" onclick="window.close()">Close</button>
+</div>
+
+{# what the bill shows is set in Cafe profile > Bill & print (name, title, logo, tax lines, UPI) #}
+<main class="slip">
+    {% if restaurant.print_logo and restaurant.logo %}<img class="slip-logo" src="{{ restaurant.logo.url }}" alt="">{% endif %}
+    <div class="slip-center slip-strong">{{ restaurant.bill_name }}</div>
+    {% if restaurant.address %}<div class="slip-center slip-small">{{ restaurant.address|linebreaksbr }}</div>{% endif %}
+    {% if restaurant.phone %}<div class="slip-center slip-small">Ph: {{ restaurant.phone }}</div>{% endif %}
+    {% if restaurant.print_tax_details and restaurant.gstin %}<div class="slip-center slip-small">GSTIN: {{ restaurant.gstin }}</div>{% endif %}
+    {% if restaurant.fssai_no %}<div class="slip-center slip-small">FSSAI: {{ restaurant.fssai_no }}</div>{% endif %}
+    <div class="slip-rule"></div>
+    <div class="slip-center slip-title">{% if bill.status == "CANCELLED" %}CANCELLED BILL{% else %}{{ restaurant.invoice_title }}{% endif %}</div>
+    <div class="slip-rule"></div>
+
+    <div class="slip-row"><span>Bill No: {{ bill.bill_no }}</span><span>{{ bill.bill_date|date:"d-m-Y" }}</span></div>
+    <div class="slip-row"><span>{{ bill.order.print_label }}</span><span>{{ bill.created_at|time:"h:i A" }}</span></div>
+    {% if bill.order.is_parcel and bill.order.customer_phone %}<div class="slip-row"><span>Mobile</span><span>{{ bill.order.customer_phone }}</span></div>{% endif %}
+    <div class="slip-row"><span>Order: #{{ bill.order.order_no }}</span><span>{{ bill.order.customer_name|truncatechars:16 }}</span></div>
+    {% if bill.order.customer_address %}<div class="slip-note">Address: {{ bill.order.customer_address }}</div>{% endif %}
+    {% if bill.order.is_delivery and bill.order.rider %}<div class="slip-row"><span>Rider</span><span>{{ bill.order.rider.name }}</span></div>{% endif %}
+    <div class="slip-rule"></div>
+
+    <div class="slip-line slip-head"><span>Item</span><span>Qty</span><span>Rate</span><span>Amt</span></div>
+    <div class="slip-rule slip-rule--thin"></div>
+    {% for line in items %}
+    <div class="slip-line"><span>{{ line.item_name }}</span><span>{{ line.qty }}</span><span>{{ line.rate|floatformat:2 }}</span><span>{{ line.amount|floatformat:2 }}</span></div>
+    {% endfor %}
+    <div class="slip-rule"></div>
+
+    <div class="slip-row"><span>Subtotal</span><span>{{ bill.subtotal|floatformat:2 }}</span></div>
+    {% if bill.discount_amount %}<div class="slip-row"><span>Discount{% if bill.offer_name %} ({{ bill.offer_name }}){% endif %}</span><span>-{{ bill.discount_amount|floatformat:2 }}</span></div>{% endif %}
+    {% if bill.delivery_charge %}<div class="slip-row"><span>Delivery charge</span><span>{{ bill.delivery_charge|floatformat:2 }}</span></div>{% endif %}
+    {% if restaurant.print_tax_details %}
+    {% if bill.discount_amount or bill.delivery_charge %}<div class="slip-row"><span>Taxable</span><span>{{ bill.taxable_amount|floatformat:2 }}</span></div>{% endif %}
+    <div class="slip-row"><span>CGST @ {{ bill.half_percent|percent }}%</span><span>{{ bill.cgst_amount|floatformat:2 }}</span></div>
+    <div class="slip-row"><span>SGST @ {{ bill.half_percent|percent }}%</span><span>{{ bill.sgst_amount|floatformat:2 }}</span></div>
+    {% elif bill.tax_amount %}
+    <div class="slip-row"><span>Taxes</span><span>{{ bill.tax_amount|floatformat:2 }}</span></div>
+    {% endif %}
+    <div class="slip-row"><span>Round off</span><span>{{ bill.round_off|floatformat:2 }}</span></div>
+    <div class="slip-rule"></div>
+    <div class="slip-big"><span>GRAND TOTAL</span><span>{{ bill.grand_total|inr }}</span></div>
+    <div class="slip-rule"></div>
+
+    {% if payments %}
+    {% for p in payments %}
+    <div class="slip-row"><span>{{ p.get_mode_display }}{% if p.reference_no %} ({{ p.reference_no }}){% endif %}</span><span>{{ p.amount|floatformat:2 }}</span></div>
+    {% endfor %}
+    {% if bill.balance %}<div class="slip-row slip-head"><span>Balance due</span><span>{{ bill.balance|floatformat:2 }}</span></div>{% endif %}
+    <div class="slip-rule"></div>
+    {% endif %}
+
+    {% if restaurant.shows_upi_on_bill and bill.is_open_for_payment %}
+    <div class="slip-upi">
+        <div class="slip-center slip-head">Scan &amp; pay by UPI</div>
+        {% if restaurant.upi_qr %}<img class="slip-upi-qr" src="{{ restaurant.upi_qr.url }}" alt="UPI QR code">{% endif %}
+        {% if restaurant.upi_id %}<div class="slip-center">UPI ID: {{ restaurant.upi_id }}</div>{% endif %}
+    </div>
+    <div class="slip-rule"></div>
+    {% endif %}
+
+    <div class="slip-center slip-strong">Thank you! Visit again.</div>
+    <div class="slip-center slip-small">Prices in &#8377;.{% if restaurant.print_tax_details %} GST included as shown above.{% endif %}</div>
+</main>
+
+<script>
+    window.addEventListener("load", function () { window.print(); });
+</script>
+</body>
+</html>

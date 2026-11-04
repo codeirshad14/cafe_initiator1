@@ -1,0 +1,31 @@
+{% load money %}
+{% comment %}
+One dish in the guest menu list: a big photo filling the card's height, then
+name, short description, veg / non-veg, prep time / sizes, and a bottom row
+with the price and the + button. Tapping the card opens the dish's details
+(a sheet over the menu). Needs: item, ordering, table or restaurant.
+{% endcomment %}
+{% if ordering %}{% url 'orders:dish_detail' table.qr_token item.pk as dish_url %}{% else %}{% url 'orders:view_dish' restaurant.slug item.pk as dish_url %}{% endif %}
+<article class="gm-dish{% if not item.is_available %} is-out{% endif %}"
+         data-name="{{ item.name|lower }} {{ item.description|lower }}" data-food="{{ item.food_type }}">
+    {# the whole card opens the details; the + button sits above this link #}
+    <a class="gm-dish-link" href="{{ dish_url }}" hx-get="{{ dish_url }}" hx-target="#sheet" hx-push-url="false">
+        <span class="visually-hidden">{{ item.name }}: see details</span>
+    </a>
+    <div class="gm-dish-photo">{% include "orders/_plate.html" with size="md" %}</div>
+    <div class="gm-dish-text">
+        <h3 class="gm-dish-name"><span>{{ item.name }}</span></h3>
+        {% if item.description %}<p class="gm-dish-desc">{{ item.description }}</p>{% endif %}
+        <div class="gm-dish-meta">
+            {% if not item.is_available %}<span class="gm-sold">Sold out today</span>{% endif %}
+            {# the same chip as the Veg / Non-veg filter: the mark and the word #}
+            <span class="gm-food"><span class="food-dot food-{{ item.food_type|lower }}" aria-hidden="true"></span> {{ item.get_food_type_display }}</span>
+            {% if item.prep_time %}<span><i class="bi bi-clock" aria-hidden="true"></i> {{ item.prep_time }}</span>{% endif %}
+            {% if item.sizes %}<span><i class="bi bi-layers" aria-hidden="true"></i> {{ item.sizes|length }} sizes</span>{% endif %}
+        </div>
+        <div class="gm-dish-foot">
+            <strong class="gm-price">{% if item.sizes %}<small>from</small> {% endif %}{{ item.price|inr_short }}</strong>
+            {% if ordering %}{% include "orders/_dish_control.html" %}{% endif %}
+        </div>
+    </div>
+</article>

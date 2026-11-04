@@ -1,0 +1,6 @@
+{% load money %}
+{# the round's total above the Send button #}
+<div id="waiterTotal" class="pos-total"{% if oob %} hx-swap-oob="true"{% endif %}>
+    <span>Total <small>{{ cart.count }} item{{ cart.count|pluralize }}</small></span>
+    <strong class="tnum">{{ cart.total|inr }}</strong>
+</div>

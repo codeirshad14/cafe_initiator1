@@ -1,0 +1,80 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Printers{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><a href="{% url 'core:restaurant_settings' %}">Cafe profile</a><span>/</span><span>Printers</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% comment %}
+Each computer chooses its own printers; the choice stays in this browser
+(static/js/printing.js). The selects are filled from the print helper.
+{% endcomment %}
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="printers" %}
+<div class="split-grid">
+    <section class="panel" id="printerSettings" data-test-slip="{% url 'core:printer_test_slip' %}">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Printers on this computer</h2>
+                <p class="panel-sub">Print buttons print straight to these printers, with no print window.</p>
+            </div>
+            <span class="status-badge status-muted" id="helperStatus" role="status">Checking…</span>
+        </div>
+        <div class="panel-body">
+            <div class="helper-off" id="helperOff" hidden>
+                <i class="bi bi-plug" aria-hidden="true"></i>
+                <div>
+                    <strong>The print helper is not running on this computer.</strong>
+                    <span>Start it (see the steps), then press Check again. Until then, print buttons open the print window.</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-light" data-helper-check><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Check again</button>
+            </div>
+
+            <div class="printer-choice">
+                <label class="form-label" for="billPrinter"><i class="bi bi-receipt" aria-hidden="true"></i> Bill printer</label>
+                <div class="printer-pick">
+                    <select class="form-select" id="billPrinter" data-printer-for="bill">
+                        <option value="">Print window (choose each time)</option>
+                    </select>
+                    <button type="button" class="btn btn-light" data-printer-test="bill"><i class="bi bi-printer" aria-hidden="true"></i> Test</button>
+                </div>
+            </div>
+
+            <div class="printer-choice">
+                <label class="form-label" for="kotPrinter"><i class="bi bi-fire" aria-hidden="true"></i> KOT printer</label>
+                <div class="printer-pick">
+                    <select class="form-select" id="kotPrinter" data-printer-for="kot">
+                        <option value="">Print window (choose each time)</option>
+                    </select>
+                    <button type="button" class="btn btn-light" data-printer-test="kot"><i class="bi bi-printer" aria-hidden="true"></i> Test</button>
+                </div>
+                <div class="form-text">One printer for everything? Choose the same printer for both.</div>
+            </div>
+
+            <p class="form-hint mb-0">Saved on this computer as soon as you choose. Each counter or kitchen computer chooses its own printers.</p>
+        </div>
+    </section>
+
+    <aside class="bill-side">
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">Set up once</h2>
+                    <p class="panel-sub">On each computer that prints. For 3-inch (80 mm) POS printers.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <ol class="setup-steps">
+                    <li>Install the printer's Windows driver and print a Windows test page.</li>
+                    <li>Install <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Python 3</a> (tick "Add python.exe to PATH").</li>
+                    <li>
+                        Download the print helper, unzip it and double-click <strong>Start Mr Cafe print</strong>. Keep its window open (you may minimise it).
+                        <a class="btn btn-sm btn-primary mt-2" href="{% url 'core:print_helper_download' %}" download><i class="bi bi-download" aria-hidden="true"></i> Download print helper</a>
+                    </li>
+                    <li>Come back here, choose the printers and press <strong>Test</strong>. If the browser asks to reach devices on your network, click Allow.</li>
+                </ol>
+                <p class="form-hint mb-0">To start the helper with Windows: press Win+R, type <code>shell:startup</code> and put a shortcut to <strong>Start Mr Cafe print</strong> in that folder.</p>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

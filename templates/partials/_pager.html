@@ -1,0 +1,39 @@
+{% comment %}
+The foot of a long list: "1–100 of 834 bills", the pages (100 rows each) and All
+(core/pagination.py paginate()). Every button reloads the list's rows with HTMX:
+
+    {% url 'menu:menu_item_rows' as rows_url %}
+    {% include "partials/_pager.html" with target="#itemRows" include="#itemFilters" what="items" one="item" %}
+
+include: the filter form, so a page keeps the search and filters (optional).
+swap: how the rows are put back (innerHTML by default; outerHTML for a report).
+The hidden "page" keeps the page when the list redraws itself after a save
+(the list's box sends it along: hx-include="#itemFilters, #itemRows [name=page]").
+{% endcomment %}
+<div class="panel-foot pager">
+    <input type="hidden" name="page" value="{{ pager.value }}">
+    <span class="pager-info">
+        {% if pager.show_all or not pager.many %}<strong>{{ pager.count }}</strong>
+        {% else %}<strong>{{ pager.start }}–{{ pager.end }}</strong> of <strong>{{ pager.count }}</strong>{% endif %}
+        {% if pager.count == 1 %}{{ one }}{% else %}{{ what }}{% endif %}
+    </span>
+    {% if pager.many %}
+    <nav class="pager-pages" aria-label="Pages">
+        {% for link in pager.links %}
+        {% if link.gap %}<span class="pager-gap" aria-hidden="true">…</span>
+        {% elif link.current %}<span class="pager-btn is-current" aria-current="page">{{ link.label }}</span>
+        {% elif link.value %}<button type="button" class="pager-btn" aria-label="{{ link.aria }}"
+                hx-get="{{ rows_url }}" hx-target="{{ target }}" hx-swap="{{ swap|default:'innerHTML' }}"
+                hx-vals='{"page": "{{ link.value }}"}'{% if include %} hx-include="{{ include }}"{% endif %}>{{ link.label }}</button>
+        {% else %}<span class="pager-btn is-off" aria-hidden="true">{{ link.label }}</span>{% endif %}
+        {% endfor %}
+        {% if pager.show_all %}
+        <button type="button" class="pager-btn pager-all" hx-get="{{ rows_url }}" hx-target="{{ target }}" hx-swap="{{ swap|default:'innerHTML' }}"
+                hx-vals='{"page": "1"}'{% if include %} hx-include="{{ include }}"{% endif %}>{{ pager.per_page }} per page</button>
+        {% else %}
+        <button type="button" class="pager-btn pager-all" hx-get="{{ rows_url }}" hx-target="{{ target }}" hx-swap="{{ swap|default:'innerHTML' }}"
+                hx-vals='{"page": "all"}'{% if include %} hx-include="{{ include }}"{% endif %}>All</button>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>

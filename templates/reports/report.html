@@ -1,0 +1,37 @@
+{% extends "base_staff.html" %}
+{% load static %}
+
+{% block title %}{{ report.title }}{% endblock %}
+{% block crumbs %}<span>/</span><a href="{% url 'reports:index' %}">Reports</a><span>/</span><span>{{ report.group }}</span><span>/</span><span>{{ report.title }}</span>{% endblock %}
+{% block page_title %}{{ report.title }}{% endblock %}
+
+{% block page_actions %}
+{% include "reports/partials/_switch.html" %}
+{% endblock %}
+
+{% block content %}
+{# opened from another report's row (drill down): the way back, and what this report is narrowed to #}
+{% if back or narrowed %}
+<div class="report-drill">
+    {% if back %}
+    <a class="btn btn-light btn-sm" href="{{ back }}" data-report-back>
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to {{ back_title }}
+    </a>
+    {% endif %}
+    {% for name, shown in narrowed %}
+    <span class="report-drill-chip"><span>{{ name }}</span> {{ shown }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# the period (Today / This week / This month / Range) and a search over every row: the same row as Bookings #}
+{% url 'reports:report' slug as filter_url %}
+{% include "partials/_period_filter.html" with filter_target="#reportBody" filter_label="Period" filter_icon="calendar-range" search_placeholder="Search any name, number, table, mode…" %}
+
+{% include "reports/partials/_body.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/filter.js' %}"></script>
+<script src="{% static 'js/reports.js' %}"></script>
+{% endblock %}

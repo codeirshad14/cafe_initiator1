@@ -1,0 +1,25 @@
+{% comment %}
+The live kitchen board. Asks again every 5 seconds and replaces itself; a
+status button sends back this same board (screen=kitchen).
+data-alert-count: static/js/live.js beeps when the number of NEW KOTs grows.
+hx-sync: button presses and refreshes wait for each other, so the board never
+jumps back to an older state.
+{% endcomment %}
+<div id="kitchenBoard" class="kitchen-board" data-alert-count="{{ new_count }}"
+     hx-get="{% url 'orders:kitchen' %}" hx-trigger="every 5s, liveChanged from:body" hx-swap="outerHTML" hx-sync="this:queue all">
+    {% for col in columns %}
+    <section class="kitchen-col kitchen-col--{{ col.status|lower }}" aria-labelledby="col-{{ col.status }}">
+        <header class="kitchen-col-head">
+            <h2 id="col-{{ col.status }}"><i class="bi bi-{{ col.icon }}" aria-hidden="true"></i> {{ col.title }}</h2>
+            <span class="kitchen-count">{{ col.kots|length }}</span>
+        </header>
+        <div class="kitchen-col-body">
+            {% for kot in col.kots %}
+            {% include "orders/_kot_card.html" %}
+            {% empty %}
+            <p class="kitchen-empty">{% if col.status == "NEW" %}No new KOTs. They appear here by themselves.{% elif col.status == "PREPARING" %}Nothing on the stove.{% else %}Nothing waiting for a waiter.{% endif %}</p>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</div>

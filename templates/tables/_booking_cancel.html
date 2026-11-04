@@ -1,0 +1,16 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{% if blocked %}
+<div class="confirm-box confirm-box--blocked" role="alert">
+    <span class="confirm-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
+    <p>{{ blocked }}</p>
+</div>
+{% else %}
+<p class="form-note">
+    <i class="bi bi-calendar-x" aria-hidden="true"></i>
+    <span>{{ booking.customer_name }}, {{ booking.date|date:"d M" }} at {{ booking.time|time:"h:i A" }} until {% if booking.is_multi_day %}{{ booking.end_date|date:"d M" }}, {% endif %}{{ booking.end_time|time:"h:i A" }}, {{ booking.guests }} guests. The table becomes free for others.</span>
+</p>
+<div class="mt-3">{% include "partials/_field.html" with field=form.reason %}</div>
+{% endif %}
+{% endblock %}

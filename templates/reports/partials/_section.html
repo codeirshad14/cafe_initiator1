@@ -1,0 +1,53 @@
+{% comment %}
+One table of a report (reports/catalog/common.py, made ready by reports.views.with_cells):
+striped rows, numbers on the right, totals at the foot (the whole period's),
+100 rows a page with the shared pager (partials/_pager.html).
+data-search: what the search box looks in (static/js/filter.js).
+A row with an href (drill down) opens what is behind it: its first cell is the
+link, and a click anywhere on the row follows it (static/js/reports.js).
+{% endcomment %}
+<section class="panel report-section" data-search-group>
+    {% if section.title %}<h2 class="report-section-title">{{ section.title }}</h2>{% endif %}
+    {% if section.rows %}
+    <div class="table-wrap table-scroll">
+        <table class="data-table table-stack report-table">
+            <thead>
+                <tr>{% for head in section.heads %}<th{% if head.numeric %} class="num"{% endif %}>{{ head.label }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for row in section.cells %}
+                <tr data-search="{{ row.search }}"{% if row.href %} class="is-drill" data-drill="{{ row.href }}"{% endif %}>
+                    {% for cell in row.values %}
+                    <td data-label="{{ cell.label }}"{% if forloop.first %} class="cell-main"{% elif cell.numeric %} class="num"{% endif %}>{% if forloop.first and row.href %}<a class="drill-link" href="{{ row.href }}">{% include "reports/partials/_value.html" %}<i class="bi bi-chevron-right" aria-hidden="true"></i></a>{% else %}{% include "reports/partials/_value.html" %}{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if section.total_cells %}
+            <tfoot>
+                <tr>
+                    {% for cell in section.total_cells %}
+                    <td data-label="{{ cell.label }}"{% if forloop.first %} class="cell-main"{% elif cell.value == "" %} class="cell-blank"{% elif cell.numeric %} class="num"{% endif %}>{% if cell.value != "" %}<strong>{% include "reports/partials/_value.html" %}</strong>{% endif %}</td>
+                    {% endfor %}
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+    {% url 'reports:report' slug as report_url %}
+    {% with rows_url=report_url|add:"?"|add:filter_query %}
+    {% include "partials/_pager.html" with pager=section.pager target="#reportBody" swap="outerHTML" what="rows" one="row" %}
+    {% endwith %}
+    {% else %}
+    <div class="empty-state empty-state--small">
+        <span class="empty-icon"><i class="bi bi-bar-chart-line" aria-hidden="true"></i></span>
+        {% if search %}
+        <h3>Nothing matches “{{ search }}”</h3>
+        <p>Try other words, or clear the search box.</p>
+        {% else %}
+        <h3>Nothing in this period</h3>
+        <p>Pick another period above.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>

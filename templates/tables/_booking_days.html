@@ -1,0 +1,82 @@
+{% comment %}
+Bookings date by date (tables.periods.booking_days), on the Floor (This week /
+This month / Range) and on the Bookings page. Each day: its date, its tables
+coloured like the floor's tiles, then its bookings.
+
+Needs: days, today, tomorrow. full_actions: the Bookings page's buttons on
+each booking (Confirm, Seated, Give table, No-show, Cancel); without it just
+Edit / Give table. empty_hint: what to say when there is nothing.
+data-search / data-search-group: the filter row's search (static/js/filter.js).
+{% endcomment %}
+{% for day in days %}
+<section class="panel summary-day" data-search-group>
+    <header class="summary-day-head">
+        <span class="summary-date">
+            <strong>{{ day.date|date:"j" }}</strong>
+            <small>{{ day.date|date:"M" }}</small>
+        </span>
+        <div>
+            <h3>{{ day.date|date:"l" }}{% if day.date == today %} <span class="summary-tag">Today</span>{% elif day.date == tomorrow %} <span class="summary-tag">Tomorrow</span>{% endif %}</h3>
+            <small>{{ day.bookings|length }} booking{{ day.bookings|length|pluralize }} · {{ day.guests }} guest{{ day.guests|pluralize }}</small>
+        </div>
+    </header>
+
+    {# every table that day, coloured like the floor: red booked (tap: the booking), green free (tap: book it), today also occupied / bill printed #}
+    <div class="mini-tiles" role="list" aria-label="Tables on {{ day.date|date:'D j M' }}">
+        {% for cell in day.tables %}
+        {% if cell.state == "booked" %}
+        <button type="button" role="listitem" class="mini-tile tile-booked" hx-get="{% url 'tables:booking_edit' cell.booking.pk %}" hx-target="#panel" hx-swap="innerHTML"
+                title="{{ cell.table.label }}: booked {{ cell.booking.time|time:'g:i A' }}, {{ cell.booking.customer_name }} ({{ cell.booking.guests }}){% if cell.more %}, and {{ cell.more }} more booking{{ cell.more|pluralize }} that day{% endif %}">
+            <strong>{{ cell.table.name }}</strong><small>{% if cell.booking.date == day.date %}{{ cell.booking.time|time:"g:i A" }}{% elif cell.booking.end_date == day.date %}till {{ cell.booking.end_time|time:"g:i A" }}{% else %}All day{% endif %}{% if cell.more %} <span class="mini-tile-more">+{{ cell.more }}</span>{% endif %}</small>
+        </button>
+        {% elif cell.state == "free" %}
+        <button type="button" role="listitem" class="mini-tile tile-free" hx-get="{% url 'tables:booking_add' %}?day={{ day.date|date:'Y-m-d' }}&amp;table={{ cell.table.pk }}" hx-target="#panel" hx-swap="innerHTML"
+                title="{{ cell.table.label }}: free, tap to book it for {{ day.date|date:'D j M' }}">
+            <strong>{{ cell.table.name }}</strong><small>Free</small>
+        </button>
+        {% else %}
+        <a role="listitem" class="mini-tile tile-{{ cell.state }}" href="{% url 'orders:floor_table' cell.table.pk %}"
+           title="{{ cell.table.label }}: {% if cell.state == 'billed' %}bill printed{% else %}occupied now{% endif %}">
+            <strong>{{ cell.table.name }}</strong><small>{% if cell.state == "billed" %}Bill{% else %}In use{% endif %}</small>
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="booking-list">
+        {% for b in day.bookings %}
+        {% if full_actions %}
+        {% include "tables/_booking_row.html" %}
+        {% else %}
+        <article class="booking-row booking-row--{{ b.status|lower }}"
+                 data-search="{{ b.customer_name|lower }} {{ b.customer_phone }} {{ b.table.name|lower }}">
+            {% include "tables/_booking_when.html" %}
+            <div class="booking-who">
+                <strong>{{ b.customer_name }} <small>· {{ b.guests }} guest{{ b.guests|pluralize }}</small></strong>
+                <small><a href="tel:{{ b.customer_phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ b.customer_phone }}</a>{% if b.note %} · <i class="bi bi-chat-left-text" aria-hidden="true"></i> {{ b.note }}{% endif %}</small>
+            </div>
+            <div class="booking-table">
+                {% if b.table %}<span class="status-badge status-muted">{{ b.table.label }}</span>{% else %}<span class="status-badge status-danger">No table yet</span>{% endif %}
+                <span class="status-badge {% if b.status == 'REQUESTED' %}status-warning{% elif b.status == 'CONFIRMED' %}status-success{% else %}status-info{% endif %}">{{ b.get_status_display }}</span>
+            </div>
+            <div class="booking-actions">
+                {% if b.is_upcoming %}
+                <button type="button" class="btn btn-sm btn-light" hx-get="{% url 'tables:booking_edit' b.pk %}" hx-target="#panel" hx-swap="innerHTML">
+                    {% if b.table %}<i class="bi bi-pencil" aria-hidden="true"></i> Edit{% else %}<i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Give table{% endif %}
+                </button>
+                {% endif %}
+            </div>
+        </article>
+        {% endif %}
+        {% endfor %}
+    </div>
+</section>
+{% empty %}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-calendar-x" aria-hidden="true"></i></span>
+        <h3>No bookings in these days</h3>
+        <p>{{ empty_hint|default:"Use Book table at the top to reserve a table." }}</p>
+    </div>
+</section>
+{% endfor %}

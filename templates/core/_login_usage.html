@@ -1,0 +1,8 @@
+{# "3 / 5 logins": active logins against the plan's allowance. Refreshes itself after every save. #}
+<span id="loginUsage" class="usage-pill{% if not restaurant.can_add_user %} is-full{% endif %}"
+      hx-get="{% url 'core:staff_usage' %}" hx-trigger="rowsChanged from:body" hx-swap="outerHTML"
+      title="Active logins allowed by your membership, you included">
+    <i class="bi bi-person-badge" aria-hidden="true"></i>
+    <strong>{{ restaurant.active_users }} / {{ restaurant.max_users }}</strong> logins
+    {% if not restaurant.can_add_user %}<span class="usage-full">full</span>{% endif %}
+</span>

@@ -1,0 +1,52 @@
+{% if tables %}
+<div class="table-card-grid">
+    {% for t in tables %}
+    <article class="table-card{% if not t.is_active %} is-off{% endif %}">
+        <header class="table-card-head">
+            <div class="min-w-0">
+                <h3 class="table-card-name">{% if t.is_takeaway %}<i class="bi bi-bag-check" aria-hidden="true"></i> {% endif %}{{ t.name }}</h3>
+                {% if t.is_takeaway %}
+                <small class="truncate">Takeaway &amp; delivery · its QR is the Order menu's</small>
+                {% else %}
+                <small class="truncate">{{ t.section|default:"No section" }} · {{ t.capacity }} seat{{ t.capacity|pluralize }}</small>
+                {% endif %}
+            </div>
+            {% if t.is_active %}<span class="status-badge status-success">In use</span>
+            {% else %}<span class="status-badge status-muted">Off</span>{% endif %}
+        </header>
+
+        <a class="table-card-qr" href="{% url 'tables:table_qr' t.pk %}?download=1" title="Download the QR code of {{ t.name }}">
+            <img src="{% url 'tables:table_qr' t.pk %}" alt="QR code for {{ t.label }}" loading="lazy" width="148" height="148">
+        </a>
+
+        <footer class="table-card-actions">
+            <a class="btn btn-sm btn-light" href="{% url 'tables:table_qr' t.pk %}?download=1">
+                <i class="bi bi-download" aria-hidden="true"></i> QR
+            </a>
+            {# the printable card with "Scan me to Order" and the table's name (tables/qr_card.py) #}
+            <a class="btn btn-sm btn-light" href="{% url 'tables:table_qr' t.pk %}?download=1&amp;card=1" title="A small printable card with the table's name">
+                <i class="bi bi-postcard" aria-hidden="true"></i> QR + label
+            </a>
+            <button class="btn btn-sm btn-light" type="button" data-copy="{{ t.menu_url }}" title="{{ t.menu_url }}">
+                <i class="bi bi-link-45deg" aria-hidden="true"></i> Copy link
+            </button>
+            <span class="flex-grow-1"></span>
+            <button class="btn btn-sm btn-light btn-icon" type="button" title="Edit" aria-label="Edit {{ t.label }}"
+                    hx-get="{% url 'tables:table_edit' t.pk %}" hx-target="#panel"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+            <button class="btn btn-sm btn-light btn-icon btn-danger-soft" type="button" title="Delete" aria-label="Delete {{ t.label }}"
+                    hx-get="{% url 'tables:table_delete' t.pk %}" hx-target="#panel"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+        </footer>
+    </article>
+    {% endfor %}
+</div>
+<div class="panel-foot">{{ tables|length }} table{{ tables|length|pluralize }}</div>
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-qr-code" aria-hidden="true"></i></span>
+    <h3>No tables found</h3>
+    <p>Add your tables, such as T1, T2 and T3. Each gets its own QR code to print and stick on the table.</p>
+    <button class="btn btn-primary" type="button" hx-get="{% url 'tables:table_add' %}" hx-target="#panel">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add a table
+    </button>
+</div>
+{% endif %}

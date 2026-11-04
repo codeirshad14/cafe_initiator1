@@ -1,0 +1,8 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{% include "partials/_field.html" with field=form.name %}
+{% include "partials/_field.html" with field=form.address %}
+{% include "partials/_field.html" with field=form.phone %}
+{% include "partials/_field.html" with field=form.is_active %}
+{% endblock %}

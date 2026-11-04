@@ -1,0 +1,28 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{% if blocked %}
+<div class="confirm-box confirm-box--blocked" role="alert">
+    <span class="confirm-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
+    <p>{{ blocked }}</p>
+</div>
+{% else %}
+<p class="form-note">
+    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+    {% if order.is_pending %}
+    <span>The order never reached the kitchen. It is kept in the records as cancelled, with this reason.</span>
+    {% elif order.is_parcel %}
+    <span>Rounds the kitchen has not served yet are cancelled. Served rounds stay in the records.</span>
+    {% else %}
+    <span>{{ order.table.label }} becomes free, and rounds the kitchen has not served yet are cancelled. Served rounds stay in the records.</span>
+    {% endif %}
+</p>
+{% if bill %}
+<p class="form-note mt-2">
+    <i class="bi bi-receipt" aria-hidden="true"></i>
+    <span>Bill #{{ bill.bill_no }} ({{ bill.grand_total }}) is cancelled with it.</span>
+</p>
+{% endif %}
+<div class="mt-3">{% include "partials/_field.html" with field=form.reason %}</div>
+{% endif %}
+{% endblock %}

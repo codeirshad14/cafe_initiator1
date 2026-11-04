@@ -1,0 +1,4 @@
+{% if bill.status == "PAID" %}<span class="status-badge status-success">Paid</span>
+{% elif bill.status == "PARTIAL" %}<span class="status-badge status-warning">Partly paid</span>
+{% elif bill.status == "CANCELLED" %}<span class="status-badge status-danger">Cancelled</span>
+{% else %}<span class="status-badge status-info">Unpaid</span>{% endif %}

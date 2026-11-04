@@ -1,0 +1,28 @@
+{% comment %}
+− qty + on the POS screen's menu, for a dish (on its tile) or one of its sizes
+(in the size menu). Needs: item, portion (or None), qty, table.
+A dish's tile adds one by itself, so it shows this only once the dish is in
+the round; a size shows "Add +" until then. Every tap sends back the bill
+lines (#waiterSummary) and this control "out of band".
+{% endcomment %}
+<div class="pos-step pos-step--tile" id="step-{{ item.pk }}{% if portion %}-{{ portion.pk }}{% endif %}"{% if not qty and not portion %} hidden{% endif %}{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if qty %}
+    <button type="button" aria-label="One less {{ item.name }}{% if portion %} {{ portion.name }}{% endif %}"
+            hx-post="{% url 'orders:waiter_cart_remove' table.pk item.pk %}"{% if portion %} hx-vals='{"portion": "{{ portion.pk }}"}'{% endif %}
+            hx-target="#waiterSummary" hx-swap="outerHTML">
+        <i class="bi {% if qty == 1 %}bi-trash3{% else %}bi-dash-lg{% endif %}" aria-hidden="true"></i>
+    </button>
+    <span class="pos-step-count" aria-live="polite">{{ qty }}</span>
+    <button type="button" aria-label="One more {{ item.name }}{% if portion %} {{ portion.name }}{% endif %}"
+            hx-post="{% url 'orders:waiter_cart_add' table.pk item.pk %}"{% if portion %} hx-vals='{"portion": "{{ portion.pk }}"}'{% endif %}
+            hx-target="#waiterSummary" hx-swap="outerHTML">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+    </button>
+    {% elif portion %}
+    <button type="button" class="pos-size-add" aria-label="Add {{ item.name }} {{ portion.name }}"
+            hx-post="{% url 'orders:waiter_cart_add' table.pk item.pk %}" hx-vals='{"portion": "{{ portion.pk }}"}'
+            hx-target="#waiterSummary" hx-swap="outerHTML">
+        Add <i class="bi bi-plus-lg" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+</div>

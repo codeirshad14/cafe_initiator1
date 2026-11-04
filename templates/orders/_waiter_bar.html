@@ -1,0 +1,10 @@
+{% load money %}
+{# phone only: a bottom bar with the round's size, linking to the summary and Send button #}
+<div id="waiterBar" class="waiter-bar-slot d-lg-none"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if cart.count %}
+    <a class="cart-bar" href="#waiterSummaryBox">
+        <span class="cart-bar-info"><strong>{{ cart.count }} item{{ cart.count|pluralize }}</strong><span class="cart-bar-sep" aria-hidden="true">|</span><span>{{ cart.total|inr_short }}</span></span>
+        <span class="cart-bar-cta">Review &amp; send <i class="bi bi-arrow-down" aria-hidden="true"></i></span>
+    </a>
+    {% endif %}
+</div>

@@ -1,0 +1,30 @@
+{% load money %}
+{% comment %}
+How the customer paid at the door, like the Bills page: any mode, an optional
+reference (UPI ref, card last 4), or split in two modes (the first amount by
+the first mode, the rest by the second). Inside the Delivered form of the
+rider's screen and of the Deliveries board.
+    {% include "orders/_collect_fields.html" with size="lg" %}   (needs order, payment_modes)
+{% endcomment %}
+<div class="collect-fields">
+    <label class="visually-hidden" for="mode-{{ order.pk }}">Paid by</label>
+    <select id="mode-{{ order.pk }}" name="mode" class="form-select form-select-{{ size|default:'sm' }}">
+        {% for value, label in payment_modes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+    </select>
+    <label class="visually-hidden" for="ref-{{ order.pk }}">Reference</label>
+    <input id="ref-{{ order.pk }}" name="reference" class="form-control form-control-{{ size|default:'sm' }}" maxlength="50"
+           placeholder="UPI ref / card last 4 (optional)" autocomplete="off">
+    <details class="collect-split">
+        <summary><i class="bi bi-intersect" aria-hidden="true"></i> Split in 2 modes</summary>
+        <div class="collect-split-body">
+            <label for="first-{{ order.pk }}">Amount by the first mode</label>
+            <input id="first-{{ order.pk }}" name="first_amount" type="number" min="1" step="0.01" inputmode="decimal"
+                   class="form-control form-control-{{ size|default:'sm' }}" placeholder="e.g. 200">
+            <label for="second-{{ order.pk }}">The rest of {{ order.to_collect|inr }} by</label>
+            <select id="second-{{ order.pk }}" name="second_mode" class="form-select form-select-{{ size|default:'sm' }}">
+                <option value="">Choose…</option>
+                {% for value, label in payment_modes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+    </details>
+</div>

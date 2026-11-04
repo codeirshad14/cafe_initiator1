@@ -1,0 +1,29 @@
+{# the guest's booking card; asks again every 20 seconds while it waits to be confirmed #}
+<section id="bookingStatus" class="gm-card gm-booking gm-booking--{{ booking.status|lower }}"
+         {% if booking.status == "REQUESTED" %}hx-get="{% url 'orders:booking_status' booking.public_token %}" hx-trigger="every 20s" hx-swap="outerHTML"{% endif %}>
+    <div class="gm-booking-head">
+        <span class="gm-booking-icon">
+            <i class="bi bi-{% if booking.status == 'CONFIRMED' %}calendar-check{% elif booking.status == 'SEATED' %}emoji-smile{% elif booking.status == 'REQUESTED' %}telephone{% else %}calendar-x{% endif %}" aria-hidden="true"></i>
+        </span>
+        <div>
+            <strong>
+                {% if booking.status == "REQUESTED" %}Booking asked for. We will call you to confirm.
+                {% elif booking.status == "CONFIRMED" %}Your table is confirmed. See you soon!
+                {% elif booking.status == "SEATED" %}Welcome! Enjoy your meal.
+                {% elif booking.status == "NO_SHOW" %}We missed you this time.
+                {% else %}This booking was cancelled.{% endif %}
+            </strong>
+            <small>Booking #{{ booking.booking_no }}{% if booking.status == "REQUESTED" %} · <span class="live-dot" aria-hidden="true"></span> updates by itself{% endif %}</small>
+        </div>
+    </div>
+    <dl class="gm-booking-facts">
+        <div><dt>Day</dt><dd>{{ booking.date|date:"D, d M Y" }}{% if booking.is_multi_day %} – {{ booking.end_date|date:"D, d M Y" }}{% endif %}</dd></div>
+        <div><dt>Time</dt><dd>{{ booking.time|time:"h:i A" }} – {{ booking.end_time|time:"h:i A" }} <small>({{ booking.length_text }})</small></dd></div>
+        <div><dt>Guests</dt><dd>{{ booking.guests }}</dd></div>
+        {% if booking.table and booking.status == "CONFIRMED" %}<div><dt>Table</dt><dd>{{ booking.table.name }}</dd></div>{% endif %}
+        <div><dt>Name</dt><dd>{{ booking.customer_name }}</dd></div>
+        <div><dt>Mobile</dt><dd>{{ booking.customer_phone }}</dd></div>
+        {% if booking.note %}<div class="is-wide"><dt>Note</dt><dd>{{ booking.note }}</dd></div>{% endif %}
+    </dl>
+    {% if restaurant.phone %}<a class="gm-pill gm-pill--call gm-booking-call" href="tel:{{ restaurant.phone|cut:' ' }}"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Call {{ restaurant.name }}</a>{% endif %}
+</section>

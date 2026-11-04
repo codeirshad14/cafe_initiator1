@@ -1,0 +1,83 @@
+{% load money %}
+{% comment %}
+The live part of the track page. While the order is running it asks the
+server again every 10 seconds and replaces itself (HTMX polling). Once paid
+or cancelled it stops asking.
+{% endcomment %}
+<div id="trackStatus" class="c-track"
+     {% if order.is_live %}hx-get="{% url 'orders:order_track' order.public_token %}" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
+
+    <section class="c-card c-headline c-headline--{{ order.status|lower }}">
+        <span class="c-headline-icon"><i class="bi bi-{{ headline_icon }}" aria-hidden="true"></i></span>
+        <div>
+            <strong>{{ headline }}</strong>
+            {% if order.is_live %}<small><span class="live-dot" aria-hidden="true"></span> Live: updates every few seconds</small>{% endif %}
+        </div>
+    </section>
+
+    {% if delivery_steps %}
+    {# a delivery: one progress line from placed to delivered, the address and what to pay #}
+    <section class="c-card">
+        <ol class="kot-progress kot-progress--five" aria-label="Delivery progress">
+            {% for step in delivery_steps %}
+            <li class="{% if step.done %}is-done{% endif %}{% if step.current %} is-current{% endif %}"{% if step.current %} aria-current="step"{% endif %}>
+                <span class="kot-dot" aria-hidden="true"></span>
+                <span class="kot-step-label">{{ step.label }}</span>
+            </li>
+            {% endfor %}
+        </ol>
+        <dl class="c-delivery-info">
+            <div><dt><i class="bi bi-geo-alt" aria-hidden="true"></i> Deliver to</dt><dd>{{ order.customer_address }}</dd></div>
+            {% if order.rider and order.picked_up_at %}<div><dt><i class="bi bi-bicycle" aria-hidden="true"></i> Rider</dt><dd>{{ order.rider.name }}{% if order.rider.phone %} · <a href="tel:{{ order.rider.phone }}">{{ order.rider.phone }}</a>{% endif %}</dd></div>{% endif %}
+            {% if bill %}<div><dt><i class="bi bi-cash-coin" aria-hidden="true"></i> {% if bill.balance %}Pay on delivery{% else %}Paid{% endif %}</dt><dd><strong>{% if bill.balance %}{{ bill.balance|inr }}{% else %}{{ bill.grand_total|inr }}{% endif %}</strong>{% if bill.delivery_charge %} <small>(incl. delivery {{ bill.delivery_charge|inr_short }} and GST)</small>{% endif %}</dd></div>{% endif %}
+        </dl>
+    </section>
+    {% endif %}
+
+    {% for kot in kots %}
+    <section class="c-card c-kot{% if kot.status == 'CANCELLED' %} is-cancelled{% endif %}">
+        <header class="c-kot-head">
+            <div>
+                <strong>Round {{ forloop.counter }}</strong>
+                <small>KOT #{{ kot.kot_no }} · {{ kot.created_at|time:"h:i A" }}</small>
+            </div>
+            {% if kot.status == "CANCELLED" %}<span class="status-badge status-danger">Cancelled</span>{% endif %}
+        </header>
+
+        {% if kot.status != "CANCELLED" and not delivery_steps %}
+        <ol class="kot-progress" aria-label="Progress of round {{ forloop.counter }}">
+            {% for step in kot.steps %}
+            <li class="{% if step.done %}is-done{% endif %}{% if step.current %} is-current{% endif %}"{% if step.current %} aria-current="step"{% endif %}>
+                <span class="kot-dot" aria-hidden="true"></span>
+                <span class="kot-step-label">{{ step.label }}</span>
+            </li>
+            {% endfor %}
+        </ol>
+        {% endif %}
+
+        <ul class="c-kot-items">
+            {% for line in kot.items.all %}
+            <li{% if line.is_cancelled %} class="is-cancelled"{% endif %}>
+                <span>{{ line.qty }} × {{ line.item_name }}{% if line.is_cancelled %} <em>(cancelled)</em>{% endif %}</span>
+                <span>{{ line.amount|inr_short }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if kot.note %}<p class="c-kot-note"><i class="bi bi-chat-left-text" aria-hidden="true"></i> {{ kot.note }}</p>{% endif %}
+    </section>
+    {% endfor %}
+
+    <section class="c-card">
+        <div class="c-total">
+            <span>Ordered so far</span>
+            <strong>{{ total|inr }}</strong>
+        </div>
+        <p class="c-tax-note">GST is added on the final bill.</p>
+    </section>
+
+    {% if can_order_more %}
+    <a class="btn btn-primary btn-lg w-100" href="{{ order.table.menu_path }}">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Order more
+    </a>
+    {% endif %}
+</div>

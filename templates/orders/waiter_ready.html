@@ -1,0 +1,20 @@
+{% extends "base_staff.html" %}
+{% load static %}
+
+{% block title %}Ready to serve{% endblock %}
+{% block crumbs %}<span>/</span><span>Service</span><span>/</span><span>Ready to serve</span>{% endblock %}
+{% block page_title %}Ready to serve{% endblock %}
+
+{% block page_actions %}
+<button type="button" class="btn btn-light" id="soundToggle" aria-pressed="false">
+    <i class="bi bi-volume-mute" aria-hidden="true"></i> <span>Sound off</span>
+</button>
+{% endblock %}
+
+{% block content %}
+{% include "orders/_ready_list.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{# "Book a free demo". Sent by HTMX; errors come back in this same form, success swaps in _demo_thanks.html #}
+<form hx-post="{% url 'web:demo_request' %}" hx-target="#demoBox" hx-disabled-elt="find button[type=submit]" novalidate>
+    <h3 class="cta-card-title">Book a free demo</h3>
+    <div class="field-row">
+        {% include "partials/_field.html" with field=form.name %}
+        {% include "partials/_field.html" with field=form.phone %}
+    </div>
+    {% include "partials/_field.html" with field=form.restaurant_name %}
+    <div class="field-row">
+        {% include "partials/_field.html" with field=form.city %}
+        {% include "partials/_field.html" with field=form.tables %}
+    </div>
+    {% include "partials/_field.html" with field=form.message %}
+
+    {# spam trap: hidden from people, robots fill it in #}
+    <div class="trap" aria-hidden="true">
+        <label for="{{ form.website.id_for_label }}">Leave this empty</label>
+        {{ form.website }}
+    </div>
+
+    <button class="btn btn-primary btn-lg w-100" type="submit">
+        Request a call back <i class="bi bi-telephone-outbound" aria-hidden="true"></i>
+    </button>
+    <p class="cta-small">We only use your number to call you about the demo.</p>
+</form>

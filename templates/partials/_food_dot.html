@@ -1,0 +1,2 @@
+{# the Indian menu mark: green square-dot = veg, red = non-veg. Usage: with item=item #}
+<span class="food-dot food-{{ item.food_type|lower }}" title="{{ item.get_food_type_display }}"><span class="visually-hidden">{{ item.get_food_type_display }}</span></span>

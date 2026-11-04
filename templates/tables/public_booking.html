@@ -1,0 +1,42 @@
+{% extends "base_customer.html" %}
+
+{% block title %}Book a table · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page{% endblock %}
+
+{% block header %}
+{% url 'orders:public_menu' restaurant.slug as menu_url %}
+{% include "orders/_customer_header.html" with back_url=menu_url title="Book a table" %}
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-wrap--narrow gm-cart-page">
+    <section class="gm-card gm-book-intro">
+        <span class="gm-book-icon"><i class="bi bi-calendar-heart" aria-hidden="true"></i></span>
+        <div>
+            <strong>{{ restaurant.name }}</strong>
+            <p>Tell us when you are coming. We will call you to confirm your table.</p>
+        </div>
+    </section>
+
+    <form method="post" class="gm-card gm-details" id="bookForm" data-submit-once novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+        <div class="gm-book-row">
+            {% include "partials/_field.html" with field=form.date %}
+            {% include "partials/_field.html" with field=form.time %}
+        </div>
+        <div class="gm-book-row">
+            {% include "partials/_field.html" with field=form.length %}
+            {% include "partials/_field.html" with field=form.guests %}
+        </div>
+        {% include "partials/_field.html" with field=form.customer_name %}
+        {% include "partials/_field.html" with field=form.customer_phone %}
+        {% include "partials/_field.html" with field=form.note %}
+        <button type="submit" class="gm-add-btn gm-add-btn--block" id="bookButton">
+            <i class="bi bi-calendar-check" aria-hidden="true"></i> Ask for this table
+        </button>
+        <p class="gm-small-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Your booking is confirmed only after our call.</p>
+    </form>
+</div>
+{% endblock %}
+

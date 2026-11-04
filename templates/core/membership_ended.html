@@ -1,0 +1,19 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Membership ended{% endblock %}
+{% block page_title %}Membership ended{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon empty-icon--danger"><i class="bi bi-calendar-x" aria-hidden="true"></i></span>
+        <h3>{{ restaurant.name }}'s membership ended on {{ restaurant.membership_end|date:"d M Y" }}</h3>
+        <p>Your menu, tables, orders and bills are all kept safe. Renew the membership and everything opens again,
+           including the QR menus on your tables.</p>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-light"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Log out</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

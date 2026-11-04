@@ -1,0 +1,42 @@
+{% extends "base_staff.html" %}
+{% load static %}
+
+{% block title %}Kitchen{% endblock %}
+{% block crumbs %}<span>/</span><span>Service</span><span>/</span><span>Kitchen</span>{% endblock %}
+{% block page_title %}Kitchen{% endblock %}
+
+{% block page_actions %}
+{# the order of the KOTs in each column; the choice is kept (orders.staff_views.kitchen_sort) #}
+<div class="floor-periods kitchen-sort" role="radiogroup" aria-label="Order of the KOTs">
+    <label class="floor-period">
+        <input type="radio" name="sort" value="new"{% if sort == "new" %} checked{% endif %}
+               hx-get="{% url 'orders:kitchen' %}" hx-trigger="change" hx-target="#kitchenBoard" hx-swap="outerHTML">
+        <span><i class="bi bi-sort-down" aria-hidden="true"></i> Newest first</span>
+    </label>
+    <label class="floor-period">
+        <input type="radio" name="sort" value="old"{% if sort == "old" %} checked{% endif %}
+               hx-get="{% url 'orders:kitchen' %}" hx-trigger="change" hx-target="#kitchenBoard" hx-swap="outerHTML">
+        <span><i class="bi bi-sort-up" aria-hidden="true"></i> Oldest first</span>
+    </label>
+</div>
+{# a beep when a new KOT comes in (static/js/live.js); browsers need one tap to allow sound #}
+<button type="button" class="btn btn-light" id="soundToggle" aria-pressed="false">
+    <i class="bi bi-volume-mute" aria-hidden="true"></i> <span>Sound off</span>
+</button>
+{% if can_stock %}
+<button type="button" class="btn btn-light" hx-get="{% url 'orders:kitchen_stock' %}" hx-target="#panel">
+    <i class="bi bi-box-seam" aria-hidden="true"></i> Stock
+</button>
+{% endif %}
+<button type="button" class="btn btn-light" id="fullScreen">
+    <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i> Full screen
+</button>
+{% endblock %}
+
+{% block content %}
+{% include "orders/_kitchen_board.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live.js' %}"></script>
+{% endblock %}

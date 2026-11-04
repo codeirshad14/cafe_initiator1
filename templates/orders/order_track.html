@@ -1,0 +1,26 @@
+{% extends "base_customer.html" %}
+
+{% block title %}Order #{{ order.order_no }} · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page{% endblock %}
+
+{% block header %}
+{% include "orders/_customer_header.html" with back_url=menu_url title=header_title subtitle=header_subtitle %}
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-wrap--narrow gm-inner-page">
+    {% if just_placed %}
+    <section class="c-card c-placed" role="status">
+        <span class="c-placed-check"><i class="bi bi-check-lg" aria-hidden="true"></i></span>
+        <h1>Your order is placed!</h1>
+        <p>Your order number is</p>
+        <div class="c-order-no">#{{ order.order_no }}</div>
+        {% if order.is_delivery %}<p class="c-placed-type"><i class="bi bi-telephone" aria-hidden="true"></i> Delivery: we will call {{ order.customer_phone }} to confirm, then start cooking</p>
+        {% elif order.is_takeaway %}<p class="c-placed-type"><i class="bi bi-bag-check" aria-hidden="true"></i> Take away: collect it at the counter</p>{% endif %}
+        <p class="c-placed-help">Keep this number to track your order. This page updates by itself.</p>
+    </section>
+    {% endif %}
+
+    {% include "orders/_track_status.html" %}
+</div>
+{% endblock %}

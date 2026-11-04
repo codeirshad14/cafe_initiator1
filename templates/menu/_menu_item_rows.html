@@ -1,0 +1,68 @@
+{% load money %}
+{% if items %}
+<div class="table-wrap table-scroll">
+    <table class="data-table table-stack">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th class="num">Price</th>
+                <th>Stock</th>
+                <th>On menu</th>
+                <th class="text-end"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="cell-main">
+                    <div class="dish">
+                        {% if item.image %}
+                        <img class="dish-thumb" src="{{ item.image.url }}" alt="" loading="lazy">
+                        {% else %}
+                        <span class="dish-thumb dish-thumb--empty" aria-hidden="true"><i class="bi bi-image"></i></span>
+                        {% endif %}
+                        <div class="min-w-0">
+                            <strong class="dish-name">{% include "partials/_food_dot.html" %} {{ item.name }}</strong>
+                            {% if item.description %}<small class="truncate">{{ item.description }}</small>{% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td data-label="Category">{{ item.category.name }}</td>
+                <td data-label="Price" class="num">
+                    {% with sizes=item.portions.all %}
+                    {% if sizes %}
+                    <span class="portion-prices">{% for p in sizes %}<span>{{ p.name }} <strong>{{ p.price|inr_short }}</strong></span>{% endfor %}</span>
+                    {% else %}
+                    <strong>{{ item.price|inr }}</strong>
+                    {% endif %}
+                    {% endwith %}
+                </td>
+                <td data-label="Stock">{% include "menu/_availability_toggle.html" %}</td>
+                <td data-label="On menu">
+                    {% if not item.is_active %}<span class="status-badge status-muted">Hidden</span>
+                    {% elif not item.category.is_active %}<span class="status-badge status-muted" title="The category {{ item.category.name }} is hidden">Category hidden</span>
+                    {% else %}<span class="status-badge status-success">Shown</span>{% endif %}
+                </td>
+                <td class="cell-actions text-end">
+                    <div class="row-actions">
+                        <button class="btn btn-sm btn-light btn-icon" type="button" title="Edit" aria-label="Edit {{ item.name }}"
+                                hx-get="{% url 'menu:menu_item_edit' item.pk %}" hx-target="#panel"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                        <button class="btn btn-sm btn-light btn-icon btn-danger-soft" type="button" title="Delete" aria-label="Delete {{ item.name }}"
+                                hx-get="{% url 'menu:menu_item_delete' item.pk %}" hx-target="#panel"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% url 'menu:menu_item_rows' as rows_url %}
+{% include "partials/_pager.html" with target="#itemRows" include="#itemFilters" what="items" one="item" %}
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+    <h3>No menu items found</h3>
+    <p>Try another search or filter. New here? Add your categories first, then the dishes.</p>
+</div>
+{% endif %}

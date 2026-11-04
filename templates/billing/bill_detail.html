@@ -1,0 +1,94 @@
+{% extends "base_staff.html" %}
+{% load static money %}
+
+{% block title %}Bill #{{ bill.bill_no }}{% endblock %}
+{% block crumbs %}<span>/</span>{% if back %}<a href="{% url 'reports:index' %}">Reports</a>{% else %}<a href="{% url 'billing:bill_list' %}">Bills</a>{% endif %}<span>/</span><span>Bill #{{ bill.bill_no }}</span>{% endblock %}
+{% block page_title %}Bill #{{ bill.bill_no }} · {{ bill.order.place_label }}{% endblock %}
+
+{% block page_actions %}
+{% if back %}{# opened from a report's row (drill down) #}
+<a class="btn btn-light" href="{{ back }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back to report</a>
+{% endif %}
+<a class="btn btn-light" href="{% url 'billing:bill_print' bill.pk %}" target="_blank" rel="noopener"
+   data-print="bill" data-print-slip="{% url 'billing:bill_print_slip' bill.pk %}" data-print-name="Bill #{{ bill.bill_no }}"><i class="bi bi-printer" aria-hidden="true"></i> Print bill</a>
+{% if can_reopen %}
+<form method="post" action="{% url 'billing:bill_reopen' bill.pk %}" class="d-inline"
+      onsubmit="return confirm('Reopen order #{{ bill.order.order_no }} so the guests can order more? Generate the bill again afterwards.')">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-light"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reopen for more orders</button>
+</form>
+{% endif %}
+{% if can_cancel %}
+<button type="button" class="btn btn-light btn-danger-soft" hx-get="{% url 'billing:bill_cancel' bill.pk %}" hx-target="#panel">
+    <i class="bi bi-x-circle" aria-hidden="true"></i> Cancel bill
+</button>
+{% endif %}
+{% if bill.order.is_delivery %}
+<a class="btn btn-light" href="{% url 'orders:deliveries' %}"><i class="bi bi-bicycle" aria-hidden="true"></i> Deliveries</a>
+{% elif bill.order.table_id %}
+<a class="btn btn-light" href="{% url 'orders:floor' %}"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Floor</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if reopened %}
+<div class="alert alert-info d-flex gap-2 align-items-start mb-0" role="status">
+    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+    <span>Order #{{ bill.order.order_no }} was reopened for more dishes. When the guests are done,
+        {% if can_bill %}<a href="{% url 'billing:bill_create' bill.order_id %}">generate the bill again</a>{% else %}the counter generates the bill again{% endif %} to update this bill.</span>
+</div>
+{% endif %}
+{% if bill.status == "CANCELLED" %}
+<div class="alert alert-danger d-flex gap-2 align-items-start mb-0" role="status">
+    <i class="bi bi-x-octagon" aria-hidden="true"></i>
+    <span>This bill was cancelled{% if bill.cancel_reason %}: {{ bill.cancel_reason }}{% endif %}.</span>
+</div>
+{% endif %}
+
+<div class="split-grid">
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Bill</h2>
+                <p class="panel-sub">Made by {{ bill.created_by.name|default:"—" }} at {{ bill.created_at|time:"h:i A" }}</p>
+            </div>
+            {% include "billing/_bill_status.html" %}
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+                <tbody>
+                    {% for line in items %}
+                    <tr>
+                        <td><strong>{{ line.item_name }}</strong></td>
+                        <td class="num">{{ line.qty }}</td>
+                        <td class="num">{{ line.rate|inr }}</td>
+                        <td class="num">{{ line.amount|inr }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="panel-body pt-3">
+            <dl class="bill-totals">
+                <div><dt>Subtotal</dt><dd>{{ bill.subtotal|inr }}</dd></div>
+                {% if bill.discount_amount %}<div class="is-discount"><dt>Discount{% if bill.offer_name %} <small>({{ bill.offer_name }})</small>{% endif %}</dt><dd>&minus; {{ bill.discount_amount|inr }}</dd></div>{% endif %}
+                {% if bill.delivery_charge %}<div><dt>Delivery charge</dt><dd>{{ bill.delivery_charge|inr }}</dd></div>{% endif %}
+                <div><dt>Taxable amount</dt><dd>{{ bill.taxable_amount|inr }}</dd></div>
+                <div><dt>CGST {{ bill.half_percent|percent }}%</dt><dd>{{ bill.cgst_amount|inr }}</dd></div>
+                <div><dt>SGST {{ bill.half_percent|percent }}%</dt><dd>{{ bill.sgst_amount|inr }}</dd></div>
+                <div><dt>Round off</dt><dd>{{ bill.round_off|inr }}</dd></div>
+                <div class="bill-grand"><dt>Grand total</dt><dd>{{ bill.grand_total|inr }}</dd></div>
+            </dl>
+        </div>
+    </section>
+
+    <aside class="bill-side">
+        {% include "billing/_payment_box.html" %}
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/billing.js' %}"></script>
+{% endblock %}

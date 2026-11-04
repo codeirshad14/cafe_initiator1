@@ -1,0 +1,24 @@
+{% comment %}
+The Bookings page's live part: the requests still to confirm (any day), then
+the bookings of the days picked in the filter row (Today by default), date by
+date, like the Floor's summary. It asks again (for the same days) every 30
+seconds and after a side-panel save; every button sends back this same block.
+{% endcomment %}
+<div id="bookingRows" class="booking-board" hx-get="{% url 'tables:booking_list' %}?{{ filter_query }}"
+     hx-trigger="rowsChanged from:body, every 30s [!document.querySelector('#bookingRows .dropdown-menu.show')], liveChanged from:body [!document.querySelector('#bookingRows .dropdown-menu.show')]"
+     hx-swap="outerHTML" hx-target="this">
+    {% if requests %}
+    <section class="panel booking-requests" data-search-group>
+        <div class="panel-head"><div>
+            <h2 class="panel-title"><i class="bi bi-telephone" aria-hidden="true"></i> To confirm <span class="kitchen-count">{{ requests|length }}</span></h2>
+            <p class="panel-sub">Asked for on the public menu. Call the guest, then confirm or cancel.</p>
+        </div></div>
+        <div class="panel-body booking-list">
+            {% for b in requests %}{% include "tables/_booking_row.html" with show_day=True %}{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% include "tables/_booking_summary_head.html" %}
+    {% include "tables/_booking_days.html" with days=summary_days full_actions=True empty_hint="Guests book from the public menu, or press New booking for a phone call." %}
+</div>

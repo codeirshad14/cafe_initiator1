@@ -1,0 +1,46 @@
+{% load money %}
+{% comment %}
+The dishes on the cart page: photo, name (and size), prep time, − 1 +, price
+and delete. + / − / delete send view=cart (and the size), so this block comes
+back; the total in the bottom bar is updated "out of band".
+{% endcomment %}
+{% for line in cart.lines %}
+<div class="gm-line">
+    {% include "orders/_plate.html" with item=line.item size="sm" %}
+    <div class="gm-line-text">
+        <strong class="gm-line-name">{% include "partials/_food_dot.html" with item=line.item %} {{ line.name }}</strong>
+        {% if line.item.description %}<small class="gm-line-desc">{{ line.item.description|truncatechars:70 }}</small>{% endif %}
+        <div class="gm-line-foot">
+            {% if line.item.prep_time %}<span class="gm-line-time"><i class="bi bi-clock" aria-hidden="true"></i> {{ line.item.prep_time }}</span>{% endif %}
+            <div class="gm-stepper gm-stepper--sm" role="group" aria-label="Quantity of {{ line.name }}">
+                <button type="button" aria-label="One less {{ line.name }}"
+                        hx-vals='{"view": "cart"{% if line.portion %}, "portion": "{{ line.portion.pk }}"{% endif %}}'
+                        hx-post="{% url 'orders:cart_remove' table.qr_token line.item.pk %}" hx-target="#cartLines">
+                    <i class="bi bi-dash" aria-hidden="true"></i>
+                </button>
+                <span aria-live="polite">{{ line.qty }}</span>
+                <button type="button" aria-label="One more {{ line.name }}"
+                        hx-vals='{"view": "cart"{% if line.portion %}, "portion": "{{ line.portion.pk }}"{% endif %}}'
+                        hx-post="{% url 'orders:cart_add' table.qr_token line.item.pk %}" hx-target="#cartLines"
+                        {% if line.qty >= max_qty %}disabled{% endif %}>
+                    <i class="bi bi-plus" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="gm-line-side">
+        <strong class="gm-price">{{ line.amount|inr_short }}</strong>
+        <small class="gm-line-each">{{ line.rate|inr_short }} each</small>
+        <button type="button" class="gm-trash" aria-label="Remove {{ line.name }}"
+                hx-vals='{"view": "cart", "all": "1"{% if line.portion %}, "portion": "{{ line.portion.pk }}"{% endif %}}'
+                hx-post="{% url 'orders:cart_remove' table.qr_token line.item.pk %}" hx-target="#cartLines">
+            <i class="bi bi-trash3" aria-hidden="true"></i>
+        </button>
+    </div>
+</div>
+{% endfor %}
+<div class="gm-total-row">
+    <span>Item total <small>({{ cart.count }} item{{ cart.count|pluralize }})</small></span>
+    <strong>{{ cart.total|inr }}</strong>
+</div>
+{% if refresh_total %}<strong id="placeTotal" hx-swap-oob="true">{{ cart.total|inr }}</strong>{% endif %}

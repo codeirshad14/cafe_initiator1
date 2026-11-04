@@ -1,0 +1,28 @@
+{% extends "base_staff.html" %}
+{% load static %}
+
+{% block title %}Deliveries{% endblock %}
+{% block crumbs %}<span>/</span><span>Service</span><span>/</span><span>Deliveries</span>{% endblock %}
+{% block page_title %}Deliveries{% endblock %}
+
+{% block page_actions %}
+{# a beep when a new order comes in to confirm (static/js/live.js) #}
+<button type="button" class="btn btn-light" id="soundToggle" aria-pressed="false">
+    <i class="bi bi-volume-mute" aria-hidden="true"></i> <span>Sound off</span>
+</button>
+{% if can_take_order and delivery_enabled %}
+<a class="btn btn-primary" href="{% url 'orders:delivery_new' %}"><i class="bi bi-bicycle" aria-hidden="true"></i> New delivery</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if not delivery_enabled %}
+<div class="alert alert-warning">Deliveries are switched off, so the public menu does not offer them. An admin can switch them on in <strong>Restaurant</strong> settings.</div>
+{% endif %}
+<div id="deliveryArea" hx-get="{% url 'orders:deliveries' %}" hx-trigger="rowsChanged from:body" hx-target="#deliveryBoard" hx-swap="outerHTML"></div>
+{% include "orders/_delivery_board.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/live.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,14 @@
+{# above the date-wise bookings (Floor and Bookings page): the days shown, the counts and the table colours #}
+<div class="summary-head">
+    <div>
+        <h2 class="summary-title"><i class="bi bi-calendar-week" aria-hidden="true"></i> Bookings {% if start == end %}{% if start == today %}today, {% endif %}{{ start|date:"D j M" }}{% else %}{{ start|date:"j M" }} – {{ end|date:"j M Y" }}{% endif %}</h2>
+        <p class="summary-sub">{{ summary_count }} booking{{ summary_count|pluralize }} · {{ summary_guests }} guest{{ summary_guests|pluralize }} · {{ summary_days|length }} day{{ summary_days|length|pluralize }}</p>
+    </div>
+    <div class="summary-legend" aria-label="Table colours">
+        <span class="legend-free"><span class="legend-dot"></span> Free</span>
+        <span class="legend-reserved"><span class="legend-dot"></span> Booked</span>
+        <span class="legend-occupied"><span class="legend-dot"></span> Occupied</span>
+        <span class="legend-billed"><span class="legend-dot"></span> Bill printed</span>
+    </div>
+    {% if show_bookings_link %}<a class="btn btn-sm btn-light" href="{% url 'tables:booking_list' %}?{{ filter_query }}"><i class="bi bi-calendar-check" aria-hidden="true"></i> Bookings page</a>{% endif %}
+</div>

@@ -1,0 +1,40 @@
+{% comment %}
+The report itself: redrawn by the period filter (HTMX) with its Export menu,
+so they always export the period on screen (static/js/reports.js adds the search).
+On paper it starts with the letterhead, like the CSV and PDF.
+{% endcomment %}
+<div id="reportBody" class="report-body">
+    {# three dots over the report while it loads again (period, search, page): static/js/reports.js #}
+    <div class="report-loading" role="status" aria-live="polite">
+        <span class="loading-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="visually-hidden">Loading the report…</span>
+    </div>
+    <div class="report-toolbar">
+        <p class="report-period"><i class="bi bi-calendar3" aria-hidden="true"></i> {{ period_text }}
+            {% if drillable %}<small class="report-drill-hint"><i class="bi bi-hand-index" aria-hidden="true"></i> Click a row to see its details</small>{% endif %}</p>
+        {# one Export menu: CSV, PDF (every row of the period and search) and Print (the page on screen) #}
+        <div class="report-exports dropdown">
+            <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Export
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="?{{ filter_query }}&amp;export=csv" data-export>
+                    <i class="bi bi-filetype-csv" aria-hidden="true"></i> CSV (Excel)
+                </a></li>
+                <li><a class="dropdown-item" href="?{{ filter_query }}&amp;export=pdf" data-export>
+                    <i class="bi bi-filetype-pdf" aria-hidden="true"></i> PDF
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button type="button" class="dropdown-item" data-print-report>
+                    <i class="bi bi-printer" aria-hidden="true"></i> Print
+                </button></li>
+            </ul>
+        </div>
+    </div>
+
+    {% include "reports/partials/_letterhead.html" %}
+
+    {% for section in sections %}
+    {% include "reports/partials/_section.html" %}
+    {% endfor %}
+</div>

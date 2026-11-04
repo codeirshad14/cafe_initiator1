@@ -1,0 +1,8 @@
+{# a dish photo on a round plate; without a photo, a warm tile with its first letter. Usage: with item=... size="sm|md|lg" #}
+<span class="gm-plate gm-plate--{{ size|default:'md' }}">
+    {% if item.image %}
+    <img src="{{ item.image.url }}" alt="" loading="lazy">
+    {% else %}
+    <span class="gm-plate-blank food-bg-{{ item.food_type|lower }}" aria-hidden="true">{{ item.name|slice:":1"|upper }}</span>
+    {% endif %}
+</span>

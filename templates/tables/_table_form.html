@@ -1,0 +1,17 @@
+{% extends "partials/_panel_form.html" %}
+
+{% block fields %}
+{% include "partials/_field.html" with field=form.name %}
+{% include "partials/_field.html" with field=form.section %}
+{# suggestions for the section box: the sections already in use #}
+<datalist id="sectionOptions">
+    {% for s in sections %}<option value="{{ s }}">{% endfor %}
+</datalist>
+{% include "partials/_field.html" with field=form.capacity %}
+{% include "partials/_field.html" with field=form.is_active %}
+
+<div class="form-note">
+    <i class="bi bi-shield-lock" aria-hidden="true"></i>
+    <span>The QR code uses a secret random code, not the table number, so nobody can guess another table's link.</span>
+</div>
+{% endblock %}

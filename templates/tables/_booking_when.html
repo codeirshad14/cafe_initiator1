@@ -1,0 +1,11 @@
+{% comment %}
+A booking's time on a row: from, until and how long ("7:00 PM / → 9:00 PM / 2 h").
+On a later day of a booking of several days, "since 24 Oct" (day: the day card shown).
+show_day: the date too (the requests to confirm, from any day).
+{% endcomment %}
+<div class="booking-when">
+    <strong>{{ b.time|time:"g:i A" }}</strong>
+    {% if show_day %}<small>{{ b.date|date:"D d M" }}</small>{% elif day and b.date < day.date %}<small>since {{ b.date|date:"j M" }}</small>{% endif %}
+    <small>→ {% if b.is_multi_day %}{{ b.end_date|date:"j M" }}, {% endif %}{{ b.end_time|time:"g:i A" }}</small>
+    <span class="booking-length">{{ b.length_text }}</span>
+</div>

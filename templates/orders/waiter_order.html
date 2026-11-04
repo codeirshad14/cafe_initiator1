@@ -1,0 +1,167 @@
+{% extends "base_staff.html" %}
+{% load static money %}
+
+{% block title %}{% if bill_now %}New bill{% elif is_delivery %}New delivery{% elif table.is_takeaway %}New takeaway{% else %}Order for {{ table.name }}{% endif %}{% endblock %}
+{% block crumbs %}{% if bill_now %}<span>/</span><a href="{% url 'billing:bill_list' %}">Bills</a><span>/</span><span>New bill</span>{% else %}<span>/</span><a href="{% url 'orders:floor' %}">Floor</a><span>/</span>{% if is_delivery %}<a href="{% url 'orders:deliveries' %}">Deliveries</a>{% else %}<a href="{% url 'orders:floor_table' table.pk %}">{% if table.is_takeaway %}Take away{% else %}{{ table.label }}{% endif %}</a>{% endif %}<span>/</span><span>{% if add_order %}Add items{% else %}New KOT{% endif %}</span>{% endif %}{% endblock %}
+{% block page_title %}{% if add_order %}Add items · delivery #{{ add_order.order_no }}{% elif bill_now %}New bill{% elif is_delivery %}New delivery order{% elif table.is_takeaway %}New takeaway order{% else %}New KOT · {{ table.label }}{% endif %}{% endblock %}
+
+{% block content %}
+{% comment %}
+The POS screen: categories | dish tiles | the bill.
+Tapping a tile adds one; the bill's − / + change it. Every tap answers with the
+bill lines, plus the tile's count, the total and the phone bar "out of band"
+(orders/_waiter_item_update.html). hx-sync: fast taps wait for each other.
+{% endcomment %}
+<div class="pos" hx-sync="this:queue all">
+
+    {# categories: a list on the left on big screens, a chip row on smaller ones #}
+    <nav class="pos-cats" id="categoryChips" aria-label="Menu sections">
+        <button type="button" class="pos-cat is-active" data-chip="all">All items <small>{{ dish_count }}</small></button>
+        {% for c in categories %}
+        <button type="button" class="pos-cat" data-chip="cat-{{ c.pk }}">{{ c.name }} <small>{{ c.menu_items|length }}</small></button>
+        {% endfor %}
+    </nav>
+
+    <section class="pos-menu" aria-label="Dishes">
+        <div class="pos-tools">
+            <div class="search-box">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" id="dishSearch" class="form-control" placeholder="Search dishes…" aria-label="Search dishes" autocomplete="off">
+            </div>
+            <label class="c-veg-toggle">
+                <input type="checkbox" id="vegOnly">
+                <span class="food-dot food-veg" aria-hidden="true"></span> Veg only
+            </label>
+        </div>
+
+        {% for c in categories %}
+        <section class="pos-section" id="cat-{{ c.pk }}" data-section>
+            <h2 class="pos-section-title">{{ c.name }}</h2>
+            <div class="pos-tiles">
+                {% for item in c.menu_items %}
+                {% if item.sizes %}
+                {% comment %}
+                A dish with sizes: the tile opens a small menu with − qty + for each
+                size (Qtr / Half / Full). It stays open while you adjust; tap outside to close.
+                {% endcomment %}
+                <div class="dropdown pos-tile-box" data-dish data-name="{{ item.name|lower }}" data-food="{{ item.food_type }}">
+                    <button type="button" class="pos-tile food-{{ item.food_type|lower }}{% if not item.is_available %} is-out{% endif %}"
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="{{ item.name }}: pick a size"{% if not item.is_available %} disabled{% endif %}>
+                        <span class="pos-tile-name">{% include "partials/_food_dot.html" %} {{ item.name }}</span>
+                        {% if item.is_available %}
+                        <span class="pos-tile-price"><small>{{ item.sizes|length }} size{{ item.sizes|length|pluralize }} · from</small> {{ item.sizes.0.price|inr_short }}</span>
+                        {% else %}
+                        <span class="pos-tile-out">Out of stock</span>
+                        {% endif %}
+                        {% include "orders/_tile_count.html" %}
+                    </button>
+                    <div class="dropdown-menu pos-size-menu">
+                        <p class="pos-size-head">{{ item.name }}</p>
+                        {% for p in item.sizes %}
+                        <div class="pos-size">
+                            <span class="pos-size-name"><span>{{ p.name }}</span> <strong>{{ p.price|inr_short }}</strong></span>
+                            {% include "orders/_tile_step.html" with portion=p qty=p.cart_qty %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                {% comment %}
+                A dish without sizes: a tap anywhere on the tile adds one (the
+                stretched button); once it is in the round, − qty + shows by the price.
+                {% endcomment %}
+                <div class="pos-tile food-{{ item.food_type|lower }}{% if not item.is_available %} is-out{% endif %}" data-dish data-name="{{ item.name|lower }}" data-food="{{ item.food_type }}">
+                    <button type="button" class="pos-tile-hit" aria-label="Add {{ item.name }}, {{ item.price|inr_short }}"{% if not item.is_available %} disabled{% endif %}
+                            hx-post="{% url 'orders:waiter_cart_add' table.pk item.pk %}" hx-target="#waiterSummary" hx-swap="outerHTML"></button>
+                    <span class="pos-tile-name">{% include "partials/_food_dot.html" %} {{ item.name }}</span>
+                    <div class="pos-tile-foot">
+                        {% if item.is_available %}
+                        <strong class="pos-tile-price">{{ item.price|inr_short }}</strong>
+                        {% include "orders/_tile_step.html" with portion=None qty=item.cart_qty %}
+                        {% else %}
+                        <span class="pos-tile-out">Out of stock</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+        {% empty %}
+        <div class="empty-state"><h3>No dishes on the menu yet</h3><p>An admin adds them in Menu items.</p></div>
+        {% endfor %}
+        <div class="empty-state" id="noMatch" hidden><h3>No dishes match</h3></div>
+    </section>
+
+    {# the bill: order type, the lines with − / +, guest details, total and Send #}
+    <aside class="pos-bill" id="waiterSummaryBox">
+        <form method="post" action="{% url 'orders:waiter_order_place' table.pk %}" class="pos-bill-card" id="waiterForm" data-submit-once>
+            {% csrf_token %}
+            <header class="pos-bill-head">
+                <span class="pos-bill-icon"><i class="bi {% if bill_now %}bi-receipt{% elif is_delivery %}bi-bicycle{% elif table.is_takeaway %}bi-bag-check{% else %}bi-cup-hot{% endif %}" aria-hidden="true"></i></span>
+                <div>
+                    <h2 class="pos-bill-title">{% if add_order %}Delivery #{{ add_order.order_no }}{% elif bill_now %}Counter bill{% elif is_delivery %}Delivery{% elif table.is_takeaway %}Takeaway{% else %}{{ table.label }}{% endif %}</h2>
+                    <small>{% if add_order %}More dishes for {{ add_order.customer_name }}{% elif bill_now %}Takeaway · billed now{% elif table.is_takeaway %}New KOT{% else %}Dine in · New KOT{% if open_orders %} · {{ open_orders|length }} open bill{{ open_orders|length|pluralize }}{% endif %}{% endif %}</small>
+                </div>
+            </header>
+
+            <div class="pos-bill-scroll">
+                {% if bill_now %}
+                {# "New bill": always a take-away, and Make bill goes on to the bill #}
+                <input type="hidden" name="order_type" value="TAKEAWAY">
+                <input type="hidden" name="then" value="bill">
+                {% else %}
+                {# one type per screen: a table is Dine in; the counter is New takeaway or New delivery #}
+                <input type="hidden" name="order_type" value="{{ order_type }}">
+                {% endif %}
+
+                {% include "orders/_bill_choice.html" %}
+
+                {% include "orders/_waiter_summary.html" %}
+
+                {% if add_order %}
+                {# "Add items": the customer is known already; the dishes join their delivery #}
+                <input type="hidden" name="add_to" value="{{ add_order.pk }}">
+                <div class="pos-adding">
+                    <p><i class="bi bi-person" aria-hidden="true"></i> <strong>{{ add_order.customer_name }}</strong>{% if add_order.customer_phone %} · <a href="tel:{{ add_order.customer_phone }}">{{ add_order.customer_phone }}</a>{% endif %}</p>
+                    <p><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ add_order.customer_address|default:"No address" }}</p>
+                    <p class="pos-adding-state">{% if add_order.is_pending %}Still to confirm: these dishes wait with the order until you press Confirm.{% else %}Already confirmed: these dishes go to the kitchen now.{% endif %}</p>
+                    {% include "partials/_field.html" with field=form.note %}
+                </div>
+                {% else %}
+                {# closed for a quick parcel; opens by itself for a delivery (static/js/waiter.js) #}
+                <details class="pos-guest" id="guestDetails"{% if is_delivery %} open{% endif %}>
+                    <summary><i class="bi bi-person" aria-hidden="true"></i> Guest details &amp; kitchen note</summary>
+                    <div class="pos-guest-body">
+                        <p class="pos-guest-hint" data-show-for="DELIVERY"><i class="bi bi-info-circle" aria-hidden="true"></i> A delivery needs the name, mobile and address.</p>
+                        <div class="pos-guest-row">
+                            {% include "partials/_field.html" with field=form.customer_name %}
+                            {% include "partials/_field.html" with field=form.customer_phone %}
+                        </div>
+                        {# the address: take away (optional) and delivery (needed) #}
+                        <div data-show-for="TAKEAWAY DELIVERY">
+                            {% include "partials/_field.html" with field=form.customer_address %}
+                        </div>
+                        {% include "partials/_field.html" with field=form.note %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+
+            <footer class="pos-bill-foot">
+                {% include "orders/_waiter_total.html" %}
+                <button type="submit" class="btn btn-primary btn-lg w-100" id="sendButton">
+                    {% if add_order %}<i class="bi bi-plus-circle" aria-hidden="true"></i> Add to delivery #{{ add_order.order_no }}{% elif bill_now %}<i class="bi bi-receipt" aria-hidden="true"></i> Make bill{% else %}<i class="bi bi-send" aria-hidden="true"></i> Send to kitchen{% endif %}
+                </button>
+            </footer>
+        </form>
+    </aside>
+</div>
+
+{# phone: the round's size and total stay in view; tap to jump to the bill #}
+{% include "orders/_waiter_bar.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/waiter.js' %}"></script>
+{% endblock %}

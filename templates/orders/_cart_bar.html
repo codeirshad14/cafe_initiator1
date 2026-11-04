@@ -1,0 +1,14 @@
+{% load money %}
+{# sticky bottom bar: "3 items | ₹540  View cart →". Empty cart: nothing shows. #}
+<div id="cartBar" class="cart-bar-slot"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if cart.count %}
+    <a class="cart-bar" href="{% url 'orders:cart_view' table.qr_token %}">
+        <span class="cart-bar-info">
+            <strong>{{ cart.count }} item{{ cart.count|pluralize }}</strong>
+            <span class="cart-bar-sep" aria-hidden="true">|</span>
+            <span>{{ cart.total|inr_short }}</span>
+        </span>
+        <span class="cart-bar-cta">View cart <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+    </a>
+    {% endif %}
+</div>

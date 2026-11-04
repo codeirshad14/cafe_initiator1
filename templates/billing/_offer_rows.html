@@ -1,0 +1,52 @@
+{% load money %}
+{% if offers %}
+<div class="table-wrap table-scroll">
+    <table class="data-table table-stack">
+        <thead>
+            <tr>
+                <th>Offer</th>
+                <th>Days</th>
+                <th class="num">Discount</th>
+                <th class="num">For bills from</th>
+                <th>State</th>
+                <th class="text-end"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in offers %}
+            <tr>
+                <td class="cell-main"><strong>{{ o.name }}</strong></td>
+                <td data-label="Days">{% if o.start_date == o.end_date %}{{ o.start_date|date:"D j M Y" }}{% else %}{{ o.start_date|date:"j M" }} – {{ o.end_date|date:"j M Y" }}{% endif %}</td>
+                <td data-label="Discount" class="num"><strong>{{ o.label }}</strong></td>
+                <td data-label="For bills from" class="num">{% if o.min_bill %}{{ o.min_bill|inr_short }}{% else %}Every bill{% endif %}</td>
+                <td data-label="State">
+                    {% if o.state == "running" %}<span class="status-badge status-success">Running today</span>
+                    {% elif o.state == "upcoming" %}<span class="status-badge status-info">Upcoming</span>
+                    {% elif o.state == "ended" %}<span class="status-badge status-muted">Ended</span>
+                    {% else %}<span class="status-badge status-muted">Off</span>{% endif %}
+                </td>
+                <td class="cell-actions text-end">
+                    <div class="row-actions">
+                        <button class="btn btn-sm btn-light btn-icon" type="button" title="Edit" aria-label="Edit {{ o.name }}"
+                                hx-get="{% url 'billing:offer_edit' o.pk %}" hx-target="#panel"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                        <button class="btn btn-sm btn-light btn-icon btn-danger-soft" type="button" title="Delete" aria-label="Delete {{ o.name }}"
+                                hx-get="{% url 'billing:offer_delete' o.pk %}" hx-target="#panel"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% url 'billing:offer_rows' as rows_url %}
+{% include "partials/_pager.html" with target="#offerRows" what="offers" one="offer" %}
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-stars" aria-hidden="true"></i></span>
+    <h3>No offers yet</h3>
+    <p>Add one for a festival or a special day: it is taken off every bill on those days only.</p>
+    <button class="btn btn-primary" type="button" hx-get="{% url 'billing:offer_add' %}" hx-target="#panel">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add the first offer
+    </button>
+</div>
+{% endif %}

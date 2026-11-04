@@ -1,0 +1,40 @@
+{% load money %}
+{# the live list of open take-away orders; asks again every 10 seconds #}
+<div id="takeawayList" class="takeaway-list" hx-get="{% url 'orders:floor_table' table.pk %}" hx-trigger="every 10s, liveChanged from:body" hx-swap="outerHTML">
+    {% for order in orders %}
+    <article class="panel takeaway-row">
+        <a class="takeaway-row-main" href="{% url 'orders:floor_order' order.pk %}">
+            <span class="takeaway-no">#{{ order.order_no }}</span>
+            <span class="takeaway-who">
+                <strong>{{ order.customer_name }}</strong>
+                <small>{{ order.customer_phone|default:"no mobile" }} · {{ order.created_at|time:"h:i A" }} · {{ order.minutes|duration }}</small>
+            </span>
+        </a>
+        <span class="takeaway-state">
+            {% if order.status == "BILLED" %}<span class="status-badge status-info">Bill printed</span>
+            {% elif order.ready %}<span class="status-badge status-success">Ready to hand over</span>
+            {% elif order.cooking %}<span class="status-badge status-warning">Cooking</span>
+            {% else %}<span class="status-badge status-muted">Served</span>{% endif %}
+        </span>
+        <strong class="takeaway-amount tnum">{{ order.amount|inr }}</strong>
+        <span class="takeaway-actions">
+            {% if can_bill %}
+            {% if order.status == "OPEN" %}
+            <a class="btn btn-sm btn-primary" href="{% url 'billing:bill_create' order.pk %}"><i class="bi bi-receipt" aria-hidden="true"></i> Bill</a>
+            {% elif order.bill %}
+            <a class="btn btn-sm btn-primary" href="{% url 'billing:bill_detail' order.bill.pk %}"><i class="bi bi-wallet2" aria-hidden="true"></i> Take payment</a>
+            {% endif %}
+            {% endif %}
+            <a class="btn btn-sm btn-light" href="{% url 'orders:floor_order' order.pk %}">Open</a>
+        </span>
+    </article>
+    {% empty %}
+    <section class="panel">
+        <div class="empty-state">
+            <span class="empty-icon"><i class="bi bi-bag" aria-hidden="true"></i></span>
+            <h3>No open take-away orders</h3>
+            <p>Guests can order a parcel from the public menu or the counter QR, or press <strong>New takeaway</strong>.</p>
+        </div>
+    </section>
+    {% endfor %}
+</div>

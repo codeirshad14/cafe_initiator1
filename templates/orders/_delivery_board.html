@@ -1,0 +1,160 @@
+{% load money %}
+{% comment %}
+The live Deliveries board: four columns from "To confirm" to "Out for delivery",
+then today's delivered orders and the cash with riders.
+Asks again every 15 seconds, but not while someone is choosing a rider (a
+refresh would close the list). Every button sends back this same board.
+data-alert-count: static/js/live.js beeps when a new order arrives to confirm.
+{% endcomment %}
+<div id="deliveryBoard" data-alert-count="{{ columns.0.orders|length }}"
+     hx-get="{% url 'orders:deliveries' %}" hx-trigger="every 15s [!document.querySelector('#deliveryBoard :is(select, input):focus, #deliveryBoard details[open]')], liveChanged from:body [!document.querySelector('#deliveryBoard :is(select, input):focus, #deliveryBoard details[open]')]"
+     hx-swap="outerHTML" hx-sync="this:queue all">
+    <div class="kitchen-board delivery-board">
+        {% for col in columns %}
+        <section class="kitchen-col delivery-col delivery-col--{{ col.key }}" aria-labelledby="dcol-{{ col.key }}">
+            <header class="kitchen-col-head">
+                <h2 id="dcol-{{ col.key }}"><i class="bi bi-{{ col.icon }}" aria-hidden="true"></i> {{ col.title }}</h2>
+                <span class="kitchen-count">{{ col.orders|length }}</span>
+            </header>
+            <div class="kitchen-col-body">
+                {% for order in col.orders %}
+                <article class="delivery-card">
+                    <header class="delivery-card-head">
+                        <a class="delivery-no" href="{% url 'orders:floor_order' order.pk %}" title="Open order #{{ order.order_no }}">#{{ order.order_no }}</a>
+                        <div class="delivery-who">
+                            <strong>{{ order.customer_name }}</strong>
+                            <small>{{ order.created_at|time:"h:i A" }} · <span class="text-nowrap">{{ order.minutes|duration }}</span></small>
+                        </div>
+                        <strong class="delivery-amount tnum">{% if order.bill_row %}{{ order.bill_row.grand_total|inr_short }}{% else %}{{ order.amount|inr_short }}{% endif %}</strong>
+                    </header>
+
+                    {% if order.customer_phone %}<a class="delivery-line" href="tel:{{ order.customer_phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ order.customer_phone }}</a>{% endif %}
+                    <p class="delivery-line"><i class="bi bi-geo-alt" aria-hidden="true"></i> <span>{{ order.customer_address|default:"No address" }}</span></p>
+                    <p class="delivery-items">{{ order.items_text }}</p>
+
+                    {% if col.key == "confirm" %}
+                    <div class="delivery-actions">
+                        {% if order.customer_phone %}<a class="btn btn-sm btn-light" href="tel:{{ order.customer_phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> Call</a>{% endif %}
+                        {# on the call the customer asks for more: add dishes to this same order #}
+                        {% if can_take_order %}<a class="btn btn-sm btn-light" href="{% url 'orders:waiter_order' order.table_id %}?type=DELIVERY&amp;add={{ order.pk }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add items</a>{% endif %}
+                        <button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'orders:delivery_step' order.pk 'confirm' %}"
+                                hx-target="#deliveryBoard" hx-swap="outerHTML"><i class="bi bi-check2" aria-hidden="true"></i> Confirm</button>
+                        <button type="button" class="btn btn-sm btn-light btn-danger-soft" hx-get="{% url 'orders:delivery_reject' order.pk %}"
+                                hx-target="#panel" hx-swap="innerHTML">Reject</button>
+                    </div>
+
+                    {% elif col.key == "kitchen" or col.key == "ready" %}
+                    {# rider: choose before it leaves #}
+                    {% if riders %}
+                    <form class="delivery-rider" hx-post="{% url 'orders:delivery_step' order.pk 'rider' %}" hx-target="#deliveryBoard" hx-swap="outerHTML">
+                        <label class="visually-hidden" for="rider-{{ order.pk }}">Rider for order #{{ order.order_no }}</label>
+                        <select id="rider-{{ order.pk }}" name="rider" class="form-select form-select-sm">
+                            {% if not order.rider %}<option value="">Choose a rider…</option>{% endif %}
+                            {% for rider in riders %}<option value="{{ rider.pk }}"{% if order.rider_id == rider.pk %} selected{% endif %}>{{ rider.name }}</option>{% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-light">{% if order.rider %}Change{% else %}Give{% endif %}</button>
+                    </form>
+                    {% else %}
+                    <p class="delivery-hint"><i class="bi bi-info-circle" aria-hidden="true"></i> No rider logins yet. An admin adds one in Staff (role: Rider).</p>
+                    {% endif %}
+
+                    <div class="delivery-actions">
+                        {% if order.status == "OPEN" and can_take_order %}<a class="btn btn-sm btn-light" href="{% url 'orders:waiter_order' order.table_id %}?type=DELIVERY&amp;add={{ order.pk }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add items</a>{% endif %}
+                        {% if order.status == "OPEN" %}
+                            {% if can_bill %}<a class="btn btn-sm btn-light" href="{% url 'billing:bill_create' order.pk %}"><i class="bi bi-receipt" aria-hidden="true"></i> Make bill</a>{% else %}<span class="status-badge status-muted">Bill not made</span>{% endif %}
+                        {% elif order.bill_row %}
+                            <span class="status-badge status-info">Bill #{{ order.bill_row.bill_no }}{% if order.to_collect %} · collect {{ order.to_collect|inr_short }}{% else %} · paid{% endif %}</span>
+                        {% endif %}
+                        {% if col.key == "ready" %}
+                        <button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'orders:delivery_step' order.pk 'pickup' %}"
+                                hx-target="#deliveryBoard" hx-swap="outerHTML"><i class="bi bi-bicycle" aria-hidden="true"></i> Picked up</button>
+                        {% else %}
+                        <span class="status-badge status-warning"><i class="bi bi-fire" aria-hidden="true"></i> Cooking</span>
+                        {% endif %}
+                    </div>
+
+                    {% elif col.key == "out" %}
+                    <p class="delivery-line"><i class="bi bi-person-badge" aria-hidden="true"></i> {{ order.rider.name }} · left {{ order.picked_up_at|time:"h:i A" }}</p>
+                    <p class="delivery-line ride-time{% if order.ride_minutes >= 30 %} is-slow{% endif %}"><i class="bi bi-stopwatch" aria-hidden="true"></i> On the way {{ order.ride_minutes|duration }}</p>
+                    <span class="status-badge {% if order.to_collect %}status-warning{% else %}status-success{% endif %} align-self-start">
+                        {% if order.to_collect %}Collect {{ order.to_collect|inr_short }}{% else %}Paid{% endif %}</span>
+                    <form class="delivery-rider" hx-post="{% url 'orders:delivery_step' order.pk 'deliver' %}" hx-target="#deliveryBoard" hx-swap="outerHTML"
+                          {% if order.to_collect %}hx-confirm="Delivered, and {{ order.to_collect|inr }} collected?"{% endif %}>
+                        {% if order.to_collect %}{% include "orders/_collect_fields.html" %}{% endif %}
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2-circle" aria-hidden="true"></i> Delivered</button>
+                    </form>
+                    {% endif %}
+                </article>
+                {% empty %}
+                <p class="kitchen-empty">
+                    {% if col.key == "confirm" %}New orders from the public menu appear here.{% elif col.key == "kitchen" %}Nothing cooking.{% elif col.key == "ready" %}Nothing waiting for a rider.{% else %}No rider is out.{% endif %}
+                </p>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+
+    {# delivered today: a short list #}
+    <section class="panel delivered-today">
+        <div class="panel-head"><div>
+            <h2 class="panel-title"><i class="bi bi-check2-circle" aria-hidden="true"></i> Delivered today <span class="kitchen-count">{{ delivered|length }}</span></h2>
+            {% if rides.all.count %}<p class="panel-sub">Average ride {{ rides.all.average|duration }} · fastest {{ rides.all.fastest|duration }} · slowest {{ rides.all.slowest|duration }} (picked up to delivered)</p>{% endif %}
+        </div></div>
+        <div class="panel-body">
+            {% for order in delivered %}
+            <div class="rider-cash-row">
+                <span><a href="{% url 'orders:floor_order' order.pk %}">#{{ order.order_no }}</a> · {{ order.customer_name }}
+                    <small>· {{ order.delivered_at|time:"h:i A" }} by {{ order.rider.name|default:"staff" }}{% if order.ride_minutes is not None %} · <span class="ride-time{% if order.ride_minutes >= 30 %} is-slow{% endif %}"><i class="bi bi-stopwatch" aria-hidden="true"></i> {{ order.ride_minutes|duration }}</span>{% endif %}</small></span>
+                <span>{% if order.bill_row %}<span class="status-badge {% if order.bill_row.status == 'PAID' %}status-success{% else %}status-warning{% endif %}">{{ order.bill_row.get_status_display }}</span>{% endif %}
+                    <strong class="tnum">{{ order.bill_row.grand_total|default:order.amount|inr_short }}</strong></span>
+            </div>
+            {% empty %}
+            <p class="text-secondary mb-0">Nothing delivered yet today.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# how long each rider takes, pickup to door, today #}
+    <section class="panel rider-times">
+        <div class="panel-head"><div>
+            <h2 class="panel-title"><i class="bi bi-stopwatch" aria-hidden="true"></i> Rider times today</h2>
+            <p class="panel-sub">From Picked up to Delivered. Quickest rider first.</p>
+        </div></div>
+        {% if rides.riders %}
+        <div class="table-wrap">
+            <table class="data-table table-stack">
+                <thead><tr><th>Rider</th><th class="num">Deliveries</th><th class="num">Average</th><th class="num">Fastest</th><th class="num">Slowest</th></tr></thead>
+                <tbody>
+                    {% for row in rides.riders %}
+                    <tr>
+                        <td class="cell-main"><i class="bi bi-person-badge" aria-hidden="true"></i> {{ row.rider.name }}</td>
+                        <td data-label="Deliveries" class="num">{{ row.count }}</td>
+                        <td data-label="Average" class="num"><strong>{{ row.average|duration }}</strong></td>
+                        <td data-label="Fastest" class="num">{{ row.fastest|duration }}</td>
+                        <td data-label="Slowest" class="num">{{ row.slowest|duration }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="panel-body"><p class="text-secondary mb-0">No rides finished today yet.</p></div>
+        {% endif %}
+    </section>
+
+    {# cash the riders collected today, to hand over at the counter #}
+    <section class="panel rider-cash">
+        <div class="panel-head"><div>
+            <h2 class="panel-title">Cash with riders today</h2>
+            <p class="panel-sub">Cash collected on delivery. UPI payments go straight to the restaurant.</p>
+        </div></div>
+        <div class="panel-body">
+            {% for row in rider_cash %}
+            <div class="rider-cash-row"><span><i class="bi bi-person-badge" aria-hidden="true"></i> {{ row.rider.name }} <small>· {{ row.count }} deliver{{ row.count|pluralize:"y,ies" }}</small></span><strong class="tnum">{{ row.amount|inr }}</strong></div>
+            {% empty %}
+            <p class="text-secondary mb-0">No cash collected by riders today.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>

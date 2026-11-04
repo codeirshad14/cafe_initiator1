@@ -1,0 +1,45 @@
+{% comment %}
+The filter row of the Floor and the Bookings page: which days' bookings show
+(Today by default, This week, This month, or a date Range), and a search box.
+
+    {% url 'orders:floor' as filter_url %}
+    {% include "partials/_period_filter.html" with filter_target="#floorGrid" search_placeholder="Search table or guest…" %}
+
+Needs (from tables.periods.period_context): periods, when, start, end, today.
+looks_back (the Dashboard, the rider's screen: core.analytics.period_filter_context):
+the days before today instead of after it, labelled "Period" (or filter_label,
+with filter_icon).
+filter_target: the live block a period redraws (and the search looks in).
+It sits outside that block, so the block's own refresh never resets it.
+The form's id (periodFilter) lets the block's buttons send the period along.
+filter_keep (a drilled-down report): [(name, value)] sent along with every period.
+{% endcomment %}
+<div class="floor-filter">
+    <form class="floor-when" id="periodFilter" method="get" action="{{ filter_url }}"
+          hx-get="{{ filter_url }}" hx-target="{{ filter_target }}" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, submit">
+        {% for name, value in filter_keep %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <span class="floor-filter-label">{% if looks_back %}<i class="bi bi-{{ filter_icon|default:'bar-chart-line' }}" aria-hidden="true"></i> {{ filter_label|default:"Period" }}{% else %}<i class="bi bi-calendar-check" aria-hidden="true"></i> Bookings{% endif %}</span>
+        <div class="floor-periods" role="radiogroup" aria-label="{% if looks_back %}Show figures for{% else %}Show bookings for{% endif %}">
+            {% for value, label in periods %}
+            <label class="floor-period">
+                <input type="radio" name="when" value="{{ value }}"{% if when == value %} checked{% endif %}>
+                <span>{% if value == "range" %}<i class="bi bi-calendar-range" aria-hidden="true"></i> {% endif %}{{ label }}</span>
+            </label>
+            {% endfor %}
+        </div>
+        {# shows only while Range is picked #}
+        <div class="floor-range">
+            <label class="visually-hidden" for="periodFrom">From</label>
+            <input type="date" id="periodFrom" name="from" class="form-control form-control-sm" value="{{ start|date:'Y-m-d' }}" {% if looks_back %}max{% else %}min{% endif %}="{{ today|date:'Y-m-d' }}">
+            <span>to</span>
+            <label class="visually-hidden" for="periodTo">To</label>
+            <input type="date" id="periodTo" name="to" class="form-control form-control-sm" value="{{ end|date:'Y-m-d' }}" {% if looks_back %}max{% else %}min{% endif %}="{{ today|date:'Y-m-d' }}">
+        </div>
+        <noscript><button type="submit" class="btn btn-sm btn-light">Show</button></noscript>
+    </form>
+    <div class="search-box floor-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        {# static/js/filter.js hides what does not match, in the live block #}
+        <input type="search" class="form-control" placeholder="{{ search_placeholder }}" aria-label="{{ search_placeholder }}" autocomplete="off" data-search-in="{{ filter_target }}">
+    </div>
+</div>

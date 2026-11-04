@@ -1,0 +1,21 @@
+{% comment %}
+One form field the Bootstrap way: label, input, help text and errors.
+Usage: {% include "partials/_field.html" with field=form.name %}
+{% endcomment %}
+{% if field.widget_type == "checkbox" %}
+<div class="form-check form-switch field-block{% if field.errors %} has-error{% endif %}">
+    {{ field }}
+    <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+</div>
+{% else %}
+<div class="field-block{% if field.errors %} has-error{% endif %}">
+    <label class="form-label" for="{{ field.id_for_label }}">
+        {{ field.label }}{% if field.field.required %} <span class="req" aria-hidden="true">*</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+</div>
+{% endif %}

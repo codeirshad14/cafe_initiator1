@@ -1,0 +1,49 @@
+{% comment %}
+Side panel from the Floor's red (booked now) table: who booked it, and
+"Guests arrived" (seats the booking, then opens the table's order screen),
+or Edit booking. tables.booking_views.booking_arrive
+{% endcomment %}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">{{ booking.table.label|default:"Booking" }} · booked</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+
+<form class="side-panel-form" hx-post="{% url 'tables:booking_arrive' booking.pk %}" hx-target="#panel" hx-swap="innerHTML">
+    <div class="side-panel-body">
+        <div class="arrive-card">
+            <span class="arrive-time">
+                <strong>{{ booking.time|time:"g:i" }}</strong>
+                <small>{{ booking.time|time:"A" }}</small>
+            </span>
+            <div class="arrive-who">
+                <strong>{{ booking.customer_name }}</strong>
+                <span>{{ booking.guests }} guest{{ booking.guests|pluralize }} · {{ booking.date|date:"D j M" }} · #{{ booking.booking_no }}</span>
+                <span>Until {% if booking.is_multi_day %}{{ booking.end_date|date:"D j M" }}, {% endif %}{{ booking.end_time|time:"g:i A" }} · {{ booking.length_text }}</span>
+                <a href="tel:{{ booking.customer_phone }}"><i class="bi bi-telephone" aria-hidden="true"></i> {{ booking.customer_phone }}</a>
+            </div>
+        </div>
+        {% if booking.note %}
+        <p class="form-note"><i class="bi bi-chat-left-text" aria-hidden="true"></i> <span>{{ booking.note }}</span></p>
+        {% endif %}
+        {% if booking.is_upcoming %}
+        <p class="arrive-help">
+            This table is held for them. When they come in, tap <strong>Guests arrived</strong>:
+            the booking is marked Seated{% if can_take_order %} and the order screen opens for {{ booking.table.label }}{% endif %}.
+            Someone else? Seat them at another table.
+        </p>
+        {% else %}
+        <p class="arrive-help">This booking is {{ booking.get_status_display|lower }}.</p>
+        {% endif %}
+    </div>
+
+    <div class="side-panel-foot">
+        <button type="button" class="btn btn-light" hx-get="{% url 'tables:booking_edit' booking.pk %}" hx-target="#panel" hx-swap="innerHTML">
+            <i class="bi bi-pencil" aria-hidden="true"></i> Edit booking
+        </button>
+        {% if booking.is_upcoming %}
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-person-check" aria-hidden="true"></i> Guests arrived{% if can_take_order %} – take order{% endif %}
+        </button>
+        {% endif %}
+    </div>
+</form>

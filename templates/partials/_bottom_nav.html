@@ -1,0 +1,17 @@
+{% comment %}
+Phones and tablets (below 992px): the app-style bottom bar. Up to four of the
+role's main pages (core/navigation.py, BOTTOM_NAV_ORDER), then More, which
+opens the whole menu (the sidebar drawer). Desktop has the sidebar instead.
+{% endcomment %}
+<nav class="bottom-nav" aria-label="Main">
+    {% for link in bottom_nav %}
+    <a href="{{ link.url }}" class="bottom-nav-item{% if link.is_active %} active{% endif %}"{% if link.is_active %} aria-current="page"{% endif %}>
+        <i class="bi bi-{{ link.icon }}" aria-hidden="true"></i>
+        <span>{{ link.short }}</span>
+    </a>
+    {% endfor %}
+    <button type="button" class="bottom-nav-item" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+        <i class="bi bi-grid" aria-hidden="true"></i>
+        <span>More</span>
+    </button>
+</nav>

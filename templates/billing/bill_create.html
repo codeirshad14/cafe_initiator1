@@ -1,0 +1,94 @@
+{% extends "base_staff.html" %}
+{% load money %}
+
+{% block title %}Generate bill · Order #{{ order.order_no }}{% endblock %}
+{% block crumbs %}<span>/</span><a href="{% url 'orders:floor' %}">Floor</a><span>/</span>{% if order.is_parcel %}<a href="{% url 'orders:floor_order' order.pk %}">{{ order.place_label }} #{{ order.order_no }}</a>{% else %}<a href="{% url 'orders:floor_table' order.table_id %}">{{ order.place_label }}</a>{% endif %}<span>/</span><span>Generate bill</span>{% endblock %}
+{% block page_title %}Generate bill · {{ order.place_label }}{% endblock %}
+
+{% block content %}
+{% if unserved %}
+<div class="alert alert-warning d-flex gap-2 align-items-start mb-0" role="status">
+    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+    <span>{{ unserved }} round{{ unserved|pluralize }} {{ unserved|pluralize:"is,are" }} not served yet. You can still bill now; those dishes are included.</span>
+</div>
+{% endif %}
+{% if redo %}
+<div class="alert alert-info d-flex gap-2 align-items-start mb-0" role="status">
+    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+    <span>This order was reopened after its bill. Confirming updates bill #{{ order.bill.bill_no }} with everything ordered so far.</span>
+</div>
+{% endif %}
+
+<div class="split-grid">
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Dishes</h2>
+                <p class="panel-sub">The same dish from different rounds is shown as one line.</p>
+            </div>
+        </div>
+        {% if lines %}
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+                <tbody>
+                    {% for line in lines %}
+                    <tr>
+                        <td><strong>{{ line.item_name }}</strong><br><small class="text-body-secondary">{{ line.category_name }}</small></td>
+                        <td class="num">{{ line.qty }}</td>
+                        <td class="num">{{ line.rate|inr }}</td>
+                        <td class="num"><strong>{{ line.amount|inr }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <span class="empty-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
+            <h3>Nothing to bill</h3>
+            <p>Every round of this order was cancelled. Cancel the order from the table page instead.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <aside class="panel bill-side">
+        <form method="post" id="billForm" novalidate
+              hx-get="{% url 'billing:bill_create' order.pk %}" hx-trigger="input delay:300ms, change" hx-target="#billTotals" hx-swap="outerHTML">
+            {% csrf_token %}
+            <div class="panel-head"><h2 class="panel-title">Discount</h2></div>
+            <div class="panel-body">
+                {% if offer %}
+                {# a festival offer runs today (Cafe profile > Offers): filled in, can be changed #}
+                <div class="offer-note" role="status">
+                    <i class="bi bi-stars" aria-hidden="true"></i>
+                    <span><strong>{{ offer.name }}</strong> · {{ offer.label }} applied today. Change it below if needed.</span>
+                </div>
+                {% endif %}
+                <div class="seg-radio" role="radiogroup" aria-label="Discount type">
+                    {% for choice in form.discount_type %}
+                    <label class="seg-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                <div class="field-block mt-3{% if form.discount_value.errors %} has-error{% endif %}">
+                    <label class="form-label" for="{{ form.discount_value.id_for_label }}">Discount</label>
+                    {{ form.discount_value }}
+                    {% for error in form.discount_value.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+
+                {% include "billing/_bill_totals.html" %}
+
+                {# a normal POST: HTMX on this form only listens to typing, for the preview #}
+                <button type="submit" class="btn btn-primary btn-lg w-100" id="confirmBill"{% if not lines %} disabled{% endif %}>
+                    <i class="bi bi-receipt" aria-hidden="true"></i> Confirm &amp; generate bill
+                </button>
+                {% if order.is_parcel %}
+                <a class="btn btn-light w-100 mt-2" href="{% url 'orders:floor_order' order.pk %}">Back to the order</a>
+                {% else %}
+                <a class="btn btn-light w-100 mt-2" href="{% url 'orders:floor_table' order.table_id %}">Back to the table</a>
+                {% endif %}
+            </div>
+        </form>
+    </aside>
+</div>
+{% endblock %}

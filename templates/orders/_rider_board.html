@@ -1,0 +1,92 @@
+{% load money %}
+{% comment %}
+The rider's live list: asks again every 15 seconds (not while choosing cash /
+UPI), with the period of the filter row (filter_query). Still to deliver
+always shows; delivered and collected are for the period. data-search: what
+the search box looks in (static/js/filter.js). data-alert-count:
+static/js/live.js beeps when a new delivery is given.
+{% endcomment %}
+<div id="riderBoard" class="rider-board" data-alert-count="{{ active|length }}"
+     hx-get="{% url 'orders:rider_home' %}?{{ filter_query }}" hx-trigger="every 15s [!document.querySelector('#riderBoard :is(select, input):focus, #riderBoard details[open]')], liveChanged from:body [!document.querySelector('#riderBoard :is(select, input):focus, #riderBoard details[open]')]"
+     hx-swap="outerHTML" hx-sync="this:queue all">
+
+    <div class="rider-summary">
+        <div><small>To deliver</small><strong>{{ active|length }}</strong></div>
+        <div><small>Delivered {{ period_text }}</small><strong>{{ done|length }}</strong></div>
+        <div><small>Collected {{ period_text }}</small><strong class="tnum">{{ collected|inr_short }}</strong></div>
+        <div><small>Cash with me today</small><strong class="tnum">{{ cash_today|inr_short }}</strong></div>
+    </div>
+
+    {% for order in active %}
+    <article class="panel rider-card{% if order.picked_up_at %} is-out{% endif %}"
+             data-search="#{{ order.order_no }} {{ order.customer_name|lower }} {{ order.customer_phone }} {{ order.customer_address|lower }}">
+        <header class="rider-card-head">
+            <span class="delivery-no">#{{ order.order_no }}</span>
+            <div class="delivery-who">
+                <strong>{{ order.customer_name }}</strong>
+                <small>{% if order.picked_up_at %}On the way since {{ order.picked_up_at|time:"h:i A" }} · <span class="ride-time{% if order.ride_minutes >= 30 %} is-slow{% endif %}"><i class="bi bi-stopwatch" aria-hidden="true"></i> {{ order.ride_minutes|duration }}</span>{% else %}Ready at the counter{% endif %}</small>
+            </div>
+            <span class="status-badge {% if order.picked_up_at %}status-info{% elif order.cooking %}status-warning{% else %}status-success{% endif %}">
+                {% if order.picked_up_at %}On the way{% elif order.cooking %}Cooking{% else %}Ready{% endif %}
+            </span>
+        </header>
+
+        <p class="rider-address"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> {{ order.customer_address|default:"No address given" }}</p>
+        <p class="delivery-items">{{ order.items_text }}</p>
+
+        <div class="rider-collect">
+            {% if order.to_collect is None %}
+            <span><i class="bi bi-hourglass-split" aria-hidden="true"></i> Bill not made yet. Ask the counter.</span>
+            {% elif order.to_collect %}
+            <span>Collect</span><strong class="tnum">{{ order.to_collect|inr }}</strong>
+            {% else %}
+            <span>Already paid</span><strong><i class="bi bi-check2-circle" aria-hidden="true"></i></strong>
+            {% endif %}
+        </div>
+
+        <div class="rider-actions">
+            {% if order.customer_phone %}<a class="btn btn-light btn-lg" href="tel:{{ order.customer_phone }}"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Call</a>{% endif %}
+            {% if order.customer_address %}<a class="btn btn-light btn-lg" href="https://www.google.com/maps/search/?api=1&query={{ order.customer_address|urlencode }}" target="_blank" rel="noopener"><i class="bi bi-map" aria-hidden="true"></i> Map</a>{% endif %}
+
+            {% if not order.picked_up_at %}
+            <button type="button" class="btn btn-primary btn-lg" hx-post="{% url 'orders:delivery_step' order.pk 'pickup' %}" hx-vals='{"screen": "rider"}'
+                    hx-include="#periodFilter" hx-target="#riderBoard" hx-swap="outerHTML"{% if order.to_collect is None or order.cooking %} disabled{% endif %}>
+                <i class="bi bi-bicycle" aria-hidden="true"></i> Picked up
+            </button>
+            {% else %}
+            <form class="rider-deliver" hx-post="{% url 'orders:delivery_step' order.pk 'deliver' %}" hx-include="#periodFilter" hx-target="#riderBoard" hx-swap="outerHTML"
+                  {% if order.to_collect %}hx-confirm="Delivered, and {{ order.to_collect|inr }} taken?"{% endif %}>
+                <input type="hidden" name="screen" value="rider">
+                {% if order.to_collect %}{% include "orders/_collect_fields.html" with size="lg" %}{% endif %}
+                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-check2-circle" aria-hidden="true"></i> Delivered</button>
+            </form>
+            {% endif %}
+        </div>
+    </article>
+    {% empty %}
+    <section class="panel">
+        <div class="empty-state">
+            <span class="empty-icon"><i class="bi bi-bicycle" aria-hidden="true"></i></span>
+            <h3>Nothing to deliver right now</h3>
+            <p>When the counter gives you an order, it appears here by itself.</p>
+        </div>
+    </section>
+    {% endfor %}
+
+    <section class="panel" data-search-group>
+        <div class="panel-head"><div>
+            <h2 class="panel-title">Delivered {{ period_text }}</h2>
+            {% if rides.count %}<p class="panel-sub">My average ride {{ rides.average|duration }} · fastest {{ rides.fastest|duration }} · slowest {{ rides.slowest|duration }}</p>{% endif %}
+        </div></div>
+        <div class="panel-body">
+            {% for order in done %}
+            <div class="rider-cash-row" data-search="#{{ order.order_no }} {{ order.customer_name|lower }} {{ order.customer_phone }} {{ order.customer_address|lower }}">
+                <span>#{{ order.order_no }} · {{ order.customer_name }} <small>· {% if start != end %}{{ order.delivered_at|date:"d M" }}, {% endif %}{{ order.delivered_at|time:"h:i A" }}{% if order.ride_minutes is not None %} · <span class="ride-time{% if order.ride_minutes >= 30 %} is-slow{% endif %}"><i class="bi bi-stopwatch" aria-hidden="true"></i> took {{ order.ride_minutes|duration }}</span>{% endif %}</small></span>
+                <strong class="tnum">{% if order.bill %}{{ order.bill.grand_total|inr_short }}{% else %}—{% endif %}</strong>
+            </div>
+            {% empty %}
+            <p class="dash-empty">Nothing delivered {{ period_text }}.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>

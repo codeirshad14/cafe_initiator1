@@ -1,0 +1,18 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Upgrade{% endblock %}
+{% block page_title %}Upgrade your plan{% endblock %}
+
+{% block content %}
+{# an Only Menu cafe opened a screen its plan does not have (core/decorators.py, core/plans.py) #}
+<section class="panel">
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></span>
+        <h3>{{ restaurant.name }} is on the {{ restaurant.get_tier_display }} plan</h3>
+        <p>Your plan has the cafe profile and your menu, with a QR code guests scan to see it.
+           Upgrade to Basic or higher for the Floor, QR ordering, Kitchen, Deliveries, Bookings,
+           Bills, Dashboard and Reports. Contact us to upgrade.</p>
+        <a class="btn btn-primary" href="{% url 'menu:menu_item_list' %}"><i class="bi bi-journal-text" aria-hidden="true"></i> Go to my menu</a>
+    </div>
+</section>
+{% endblock %}

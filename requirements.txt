@@ -1,0 +1,13 @@
+Django
+# the Django admin's look (resto/settings.py JAZZMIN_SETTINGS)
+django-jazzmin
+python-decouple
+# PostgreSQL on the server
+psycopg[binary]
+# menu photos, logos and the printable QR cards
+Pillow
+qrcode
+# PDF export of the reports (reports/exports/pdf_export.py)
+reportlab
+# the app server on Linux (not used on Windows for development)
+gunicorn

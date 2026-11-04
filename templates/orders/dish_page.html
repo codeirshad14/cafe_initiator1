@@ -1,0 +1,22 @@
+{% extends "base_customer.html" %}
+{% load static %}
+
+{# a dish's details as a page of its own (the link opened directly, without the menu around it) #}
+{% block title %}{{ item.name }} · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-dish-page">
+    <div class="gm-card">
+        {% include "orders/_dish_details.html" %}
+    </div>
+</div>
+{% endblock %}
+
+{% block bottom %}
+{% if ordering %}{% include "orders/_cart_bar.html" %}{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/menu.js' %}"></script>
+{% endblock %}

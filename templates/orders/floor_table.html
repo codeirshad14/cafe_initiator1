@@ -1,0 +1,20 @@
+{% extends "base_staff.html" %}
+
+{% block title %}{% if order.is_delivery %}Delivery #{{ order.order_no }}{% elif order.is_takeaway %}Take-away #{{ order.order_no }}{% else %}{{ table.label }}{% endif %}{% endblock %}
+
+{% block crumbs %}<span>/</span><a href="{% url 'orders:floor' %}">Floor</a>{% if order.is_delivery %}<span>/</span><a href="{% url 'orders:deliveries' %}">Deliveries</a><span>/</span><span>Order #{{ order.order_no }}</span>{% elif order.is_takeaway %}<span>/</span><a href="{% url 'orders:floor_table' table.pk %}">Take away</a><span>/</span><span>Order #{{ order.order_no }}</span>{% else %}<span>/</span><span>{{ table.label }}</span>{% endif %}{% endblock %}
+{% block page_title %}{% if order.is_delivery %}Delivery order #{{ order.order_no }}{% elif order.is_takeaway %}Take-away order #{{ order.order_no }}{% else %}{{ table.label }}{% endif %}{% endblock %}
+
+{% block page_actions %}
+{% if order.is_delivery %}
+<a class="btn btn-light" href="{% url 'orders:deliveries' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> All deliveries</a>
+{% elif order.is_takeaway %}
+<a class="btn btn-light" href="{% url 'orders:floor_table' table.pk %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> All take-away</a>
+{% else %}
+<a class="btn btn-light" href="{% url 'orders:floor' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Floor</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% include "orders/_table_order.html" %}
+{% endblock %}

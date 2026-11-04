@@ -1,0 +1,134 @@
+{% load money %}
+{% comment %}
+Payments of one bill: what is paid, the balance, every payment row, and the
+form for the next row. Each Add / Remove sends back this whole box.
+data-balance: static/js/billing.js works out the change for cash live.
+{% endcomment %}
+<div id="payBox" class="pay-box" data-balance="{{ bill.balance }}">
+    <section class="panel">
+        <div class="pay-figures">
+            <div><span>Grand total</span><strong>{{ bill.grand_total|inr }}</strong></div>
+            <div><span>Paid</span><strong class="text-success-emphasis">{{ bill.paid_amount|inr }}</strong></div>
+            <div class="pay-balance{% if not bill.balance %} is-zero{% endif %}"><span>Balance</span><strong>{{ bill.balance|inr }}</strong></div>
+        </div>
+
+        {% if change %}
+        <div class="change-box" role="status">
+            <i class="bi bi-cash-coin" aria-hidden="true"></i>
+            <span>Return <strong>{{ change|inr }}</strong> change</span>
+        </div>
+        {% endif %}
+
+        {% if payments %}
+        <ul class="pay-rows">
+            {% for p in payments %}
+            <li>
+                <span class="pay-mode pay-mode--{{ p.mode|lower }}">{{ p.get_mode_display }}</span>
+                <span class="pay-meta">{{ p.created_at|time:"h:i A" }}{% if p.reference_no %} · {{ p.reference_no }}{% endif %}{% if p.received_by %} · {{ p.received_by.name }}{% endif %}</span>
+                <strong class="tnum">{{ p.amount|inr }}</strong>
+                {% if can_pay %}
+                <button type="button" class="btn btn-sm btn-light btn-icon btn-danger-soft" title="Remove this payment" aria-label="Remove {{ p.get_mode_display }} payment of {{ p.amount|inr }}"
+                        hx-post="{% url 'billing:payment_remove' bill.pk p.pk %}" hx-target="#payBox" hx-swap="outerHTML"
+                        hx-confirm="Remove this {{ p.get_mode_display }} payment of {{ p.amount|inr }}?">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if bill.status == "PAID" %}
+        <div class="paid-box">
+            <span class="empty-icon empty-icon--ok"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+            <strong>Fully paid</strong>
+            <span>{% if bill.order.is_delivery %}The order is paid.{% if not bill.order.delivered_at %} The rider can still mark it delivered.{% endif %}{% elif bill.order.is_takeaway %}The parcel order is closed.{% else %}Order #{{ bill.order.order_no }} on table {{ bill.order.table|default:"" }} is closed.{% endif %}</span>
+            <div class="paid-actions">
+                <a class="btn btn-primary" href="{% url 'billing:bill_print' bill.pk %}" target="_blank" rel="noopener"
+                   data-print="bill" data-print-slip="{% url 'billing:bill_print_slip' bill.pk %}" data-print-name="Bill #{{ bill.bill_no }}"><i class="bi bi-printer" aria-hidden="true"></i> Print bill</a>
+                <a class="btn btn-light" href="{% url 'orders:floor' %}">Back to the floor</a>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if can_pay %}
+    {% comment %}
+    One payment, or two at once with "Split: 2 modes" (e.g. part cash, part UPI):
+    the second amount fills itself with the rest of the balance (static/js/billing.js).
+    {% endcomment %}
+    <form class="panel pay-form{% if form.split.value %} is-split{% endif %}" id="payForm" hx-post="{% url 'billing:payment_add' bill.pk %}" hx-target="#payBox" hx-swap="outerHTML"
+          hx-disabled-elt="find button[type=submit]" novalidate>
+        <div class="panel-head pay-form-head">
+            <h2 class="panel-title">Take payment</h2>
+            <div class="form-check form-switch pay-split">
+                {{ form.split }}
+                <label class="form-check-label" for="{{ form.split.id_for_label }}">{{ form.split.label }}</label>
+            </div>
+        </div>
+        <div class="panel-body">
+            {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+            {# payment 1 #}
+            <div class="pay-part">
+                <p class="pay-part-title" data-split-only>Payment 1</p>
+                <div class="mode-grid" role="radiogroup" aria-label="Payment mode">
+                    {% for choice in form.mode %}
+                    <label class="mode-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+
+                <div class="field-block mt-3{% if form.amount.errors %} has-error{% endif %}">
+                    <label class="form-label" for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
+                    <div class="input-group">
+                        {{ form.amount }}
+                        <button type="button" class="btn btn-light" data-fill-balance>Full balance</button>
+                    </div>
+                    {% for error in form.amount.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="field-block" data-ref-only="1">
+                    <label class="form-label" for="{{ form.reference_no.id_for_label }}">{{ form.reference_no.label }}</label>
+                    {{ form.reference_no }}
+                    <div class="form-text">{{ form.reference_no.help_text }}</div>
+                </div>
+            </div>
+
+            {# payment 2: only with "Split: 2 modes" #}
+            <div class="pay-part pay-part--second" data-split-only>
+                <p class="pay-part-title">Payment 2 <small>the rest of the balance</small></p>
+                <div class="mode-grid" role="radiogroup" aria-label="Second payment mode">
+                    {% for choice in form.mode2 %}
+                    <label class="mode-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                {% for error in form.mode2.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+
+                <div class="field-block mt-3{% if form.amount2.errors %} has-error{% endif %}">
+                    <label class="form-label" for="{{ form.amount2.id_for_label }}">{{ form.amount2.label }}</label>
+                    {{ form.amount2 }}
+                    {% for error in form.amount2.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="field-block" data-ref-only="2">
+                    <label class="form-label" for="{{ form.reference_no2.id_for_label }}">{{ form.reference_no2.label }}</label>
+                    {{ form.reference_no2 }}
+                    <div class="form-text">{{ form.reference_no2.help_text }}</div>
+                </div>
+            </div>
+
+            {# cash: works out the change (for whichever part is cash) #}
+            <div class="field-block" data-cash-only{% if form.tendered.errors %} data-has-error{% endif %}>
+                <label class="form-label" for="{{ form.tendered.id_for_label }}">{{ form.tendered.label }}</label>
+                {{ form.tendered }}
+                <div class="form-text" id="changeHint">{{ form.tendered.help_text }}</div>
+                {% for error in form.tendered.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="pay-split-total" data-split-only>Total <strong id="splitTotal">₹0.00</strong> of balance <strong>{{ bill.balance|inr }}</strong></div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-plus-lg" aria-hidden="true"></i> <span data-split-hide>Add payment</span><span data-split-only>Add both payments</span></button>
+        </div>
+    </form>
+    {% endif %}
+</div>

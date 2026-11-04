@@ -1,0 +1,358 @@
+{% load money %}
+{% comment %}
+The CEO dashboard for the picked period (core/analytics.py): sales, menu,
+operations (kitchen, tables, deliveries), guests and team, what leaks away.
+Reloads with the filter row, and by itself when an order, bill or payment
+changes (liveChanged, core/live.py). data-search: what the search box looks in.
+
+Charts follow one method (the dataviz rules): one hue for one series (--viz-1),
+three validated hues for the three order types, a light-to-dark ramp for the
+heat map; status colours only for good / late, always with a word; every value
+written beside its mark, and a hidden table for screen readers.
+{% endcomment %}
+<div id="dashBody" class="ceo" hx-get="{% url 'core:dashboard' %}?{{ filter_query }}" hx-trigger="liveChanged from:body, every 60s" hx-swap="outerHTML">
+
+{# ---- right now, whatever the period #}
+<section class="now-strip" aria-label="Right now">
+    <span class="now-title"><span class="live-dot" aria-hidden="true"></span> Right now</span>
+    <a href="{% url 'orders:floor' %}"><strong>{{ now.open_tables }}/{{ now.table_count }}</strong> tables in use</a>
+    <a href="{% url 'orders:floor' %}"><strong>{{ now.open_parcels }}</strong> takeaway &amp; delivery open</a>
+    <a href="{% url 'orders:kitchen' %}"><strong>{{ now.pending_kots }}</strong> KOTs in the kitchen</a>
+    <a href="{% url 'orders:kitchen' %}"><strong>{{ now.ready_kots }}</strong> ready to serve</a>
+    <a href="{% url 'billing:bill_list' %}"><strong>{{ now.unpaid_bills }}</strong> bills unpaid</a>
+</section>
+
+<p class="dash-period">
+    <strong>{% if when == "today" %}Today, {{ start|date:"D d M" }}{% elif start == end %}{{ start|date:"D d M Y" }}{% else %}{{ start|date:"d M" }} – {{ end|date:"d M Y" }}{% endif %}</strong>
+    <span>compared with {% if before_start == before_end %}{{ before_start|date:"D d M" }}{% else %}{{ before_start|date:"d M" }} – {{ before_end|date:"d M" }}{% endif %}</span>
+</p>
+
+{# ================================================================ the headline #}
+<section class="ceo-hero" aria-label="Headline figures">
+    <a class="ceo-hero-card" href="{% url 'reports:report' 'daily-sales' %}">
+        <span class="ceo-label">Net sales</span>
+        <strong class="ceo-hero-value">{{ figures.sales|inr_short }}</strong>
+        <span class="ceo-hero-delta">{% include "core/_delta.html" with value=changes.sales %} <span>vs the period before</span></span>
+        {% if spark %}
+        <svg class="ceo-spark" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="Net sales trend over the period">
+            <polyline points="{{ spark }}" fill="none" vector-effect="non-scaling-stroke"></polyline>
+        </svg>
+        {% endif %}
+        <small class="ceo-hero-note">With GST, after discounts · {{ figures.bills }} bill{{ figures.bills|pluralize }}</small>
+    </a>
+    <div class="ceo-kpis">
+        <a class="ceo-kpi" href="{% url 'billing:bill_list' %}">
+            <span class="ceo-label"><i class="bi bi-receipt" aria-hidden="true"></i> Bills</span>
+            <strong>{{ figures.bills }}</strong>
+            {% include "core/_delta.html" with value=changes.bills %}
+        </a>
+        <div class="ceo-kpi">
+            <span class="ceo-label"><i class="bi bi-calculator" aria-hidden="true"></i> Average bill</span>
+            <strong>{{ figures.average|inr_short }}</strong>
+            {% include "core/_delta.html" with value=changes.average %}
+        </div>
+        <a class="ceo-kpi" href="{% url 'reports:report' 'payment-modes' %}">
+            <span class="ceo-label"><i class="bi bi-wallet2" aria-hidden="true"></i> Collected</span>
+            <strong>{{ figures.collected|inr_short }}</strong>
+            {% include "core/_delta.html" with value=changes.collected %}
+        </a>
+        <div class="ceo-kpi">
+            <span class="ceo-label"><i class="bi bi-percent" aria-hidden="true"></i> Discounts given</span>
+            <strong>{{ figures.discount|inr_short }}</strong>
+            {% include "core/_delta.html" with value=changes.discount up_is_bad=True %}
+        </div>
+        <div class="ceo-kpi">
+            <span class="ceo-label"><i class="bi bi-basket" aria-hidden="true"></i> Items per bill</span>
+            <strong>{{ figures.items_per_bill }}</strong>
+            <span class="delta delta-flat">{{ figures.items }} dish{{ figures.items|pluralize:"es" }} sold</span>
+        </div>
+        <div class="ceo-kpi">
+            <span class="ceo-label"><i class="bi bi-person-check" aria-hidden="true"></i> Guests by mobile</span>
+            <strong>{{ guests.known }}</strong>
+            <span class="delta delta-flat">{% if guests.known %}{{ guests.returning_share }}% came back{% else %}no mobile numbers yet{% endif %}</span>
+        </div>
+    </div>
+</section>
+
+{# ================================================================ sales #}
+<h2 class="ceo-section"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> Sales</h2>
+<div class="ceo-grid">
+    <section class="panel ceo-span-2">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">Sales {% if start == end %}by hour{% else %}by day{% endif %}</h3>
+            <p class="panel-sub">Net sales. Hover a bar for its figure; the best one is labelled.</p>
+        </div></div>
+        <div class="panel-body">
+            {% if figures.sales %}
+            <div class="vbar-chart{% if trend|length > 14 %} vbar-chart--dense{% endif %}" role="img" aria-label="Net sales {% if start == end %}by hour{% else %}by day{% endif %}">
+                {% for point in trend %}
+                <div class="vbar" title="{{ point.title }}: {{ point.total|inr }}">
+                    <span class="vbar-value">{% if point.height == 100 %}{{ point.total|inr_short }}{% endif %}</span>
+                    <span class="vbar-col"><span class="vbar-fill" style="height: {{ point.height }}%"></span></span>
+                    <span class="vbar-day">{% if trend|length <= 14 or forloop.first or forloop.last or forloop.counter|divisibleby:5 %}{{ point.label }}{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <table class="visually-hidden"><caption>Net sales</caption>
+                <tr><th>When</th><th>Net sales</th></tr>
+                {% for point in trend %}<tr><td>{{ point.title }}</td><td>{{ point.total|inr }}</td></tr>{% endfor %}
+            </table>
+            {% else %}<p class="dash-empty">No bills in this period yet.</p>{% endif %}
+        </div>
+    </section>
+
+    {# three order types: one stacked bar, a legend with every value (the colours never stand alone) #}
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">Dine in, takeaway, delivery</h3>
+            <p class="panel-sub">Share of net sales</p>
+        </div></div>
+        <div class="panel-body">
+            {% if figures.sales %}
+            <div class="stack-bar" role="img" aria-label="Share of net sales by order type">
+                {% for row in order_types %}{% if row.width %}<span class="stack-seg viz-{{ forloop.counter }}" style="width: {{ row.width }}%" title="{{ row.label }}: {{ row.total|inr }} ({{ row.width }}%)"></span>{% endif %}{% endfor %}
+            </div>
+            <ul class="ceo-legend">
+                {% for row in order_types %}
+                <li><span class="legend-swatch viz-{{ forloop.counter }}" aria-hidden="true"></span>
+                    <span class="ceo-legend-label">{{ row.label }} <small>{{ row.count }} bill{{ row.count|pluralize }}</small></span>
+                    <strong>{{ row.total|inr_short }}</strong><span class="ceo-legend-share">{{ row.width }}%</span></li>
+                {% endfor %}
+            </ul>
+            {% else %}<p class="dash-empty">No bills in this period yet.</p>{% endif %}
+        </div>
+    </section>
+
+    {% include "core/_dash_bars.html" with title="Payment modes" sub="Money collected in the period" rows=modes %}
+
+    {# the pivot: when the money comes in, weekday x hour #}
+    <section class="panel ceo-span-2">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">When sales come in</h3>
+            <p class="panel-sub">Net sales by weekday and hour, the period together. Darker is more.</p>
+        </div></div>
+        <div class="panel-body">
+            {% if heat %}
+            <div class="heat-wrap">
+                <table class="heat" aria-label="Net sales by weekday and hour">
+                    <thead><tr><th scope="col"><span class="visually-hidden">Day</span></th>{% for hour in heat.hours %}<th scope="col">{{ hour }}</th>{% endfor %}</tr></thead>
+                    <tbody>
+                        {% for row in heat.rows %}
+                        <tr><th scope="row">{{ row.day }}</th>
+                            {% for cell in row.cells %}<td class="heat-{{ cell.level }}" title="{{ cell.title }}: {{ cell.total|inr }}"><span class="visually-hidden">{{ cell.total|inr }}</span></td>{% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="heat-legend" aria-hidden="true"><span>Less</span>{% for level in "012345" %}<i class="heat-{{ level }}"></i>{% endfor %}<span>More</span></div>
+            {% else %}<p class="dash-empty">No bills in this period yet.</p>{% endif %}
+        </div>
+    </section>
+</div>
+
+{# ================================================================ menu #}
+<h2 class="ceo-section"><i class="bi bi-journal-text" aria-hidden="true"></i> Menu</h2>
+<div class="ceo-grid">
+    {% include "core/_dash_bars.html" with title="Categories" sub="Food sales by menu category, before GST" rows=categories count_word="item" searchable=True %}
+
+    <section class="panel">
+        <div class="panel-head">
+            <div><h3 class="panel-title">Top dishes</h3><p class="panel-sub">By amount sold, before GST</p></div>
+            <a class="btn btn-sm btn-light" href="{% url 'reports:report' 'item-sales' %}">All items</a>
+        </div>
+        <div class="panel-body">
+            {% if dishes %}
+            <ol class="rank-list">
+                {% for item in dishes %}
+                <li data-search="{{ item.item_name|lower }} {{ item.category_name|lower }}"><span class="rank-no">{{ forloop.counter }}</span><span class="rank-name">{{ item.item_name }}</span><span class="rank-qty">{{ item.qty }} sold</span><strong>{{ item.amount|inr_short }}</strong></li>
+                {% endfor %}
+            </ol>
+            {% else %}<p class="dash-empty">No dishes sold in this period yet.</p>{% endif %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">Slow movers</h3>
+            <p class="panel-sub">Dishes on the menu that sold least: worth a look</p>
+        </div></div>
+        <div class="panel-body">
+            <ul class="ceo-list">
+                {% for row in slow %}
+                <li data-search="{{ row.name|lower }} {{ row.category|lower }}">
+                    <span>{{ row.name }} <small>{{ row.category }}</small></span>
+                    {% if row.qty %}<strong>{{ row.qty }} sold</strong>{% else %}<span class="status-badge status-warning"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Not sold</span>{% endif %}
+                </li>
+                {% empty %}<li class="dash-empty">No dishes on the menu.</li>{% endfor %}
+            </ul>
+        </div>
+    </section>
+
+    {% include "core/_dash_bars.html" with title="Discounts and offers" sub="Discount given, by festival offer and by hand" rows=offers count_word="bill" %}
+</div>
+
+{# ================================================================ operations #}
+<h2 class="ceo-section"><i class="bi bi-gear-wide-connected" aria-hidden="true"></i> Operations</h2>
+<div class="ceo-grid ceo-grid--3">
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title"><i class="bi bi-fire" aria-hidden="true"></i> Kitchen</h3>
+            <p class="panel-sub">KOT sent to ready</p>
+        </div></div>
+        <div class="panel-body">
+            <dl class="ceo-mini">
+                <div><dt>KOTs</dt><dd>{{ kitchen.kots }}</dd></div>
+                <div><dt>Average prep</dt><dd>{% if kitchen.avg_prep is not None %}{{ kitchen.avg_prep|duration }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Slowest</dt><dd>{% if kitchen.slowest is not None %}{{ kitchen.slowest|duration }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Cancelled</dt><dd>{{ kitchen.cancelled }}</dd></div>
+            </dl>
+            {% include "core/_meter.html" with value=kitchen.on_time label="Ready within 15 min" %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Tables</h3>
+            <p class="panel-sub">Dine-in orders closed in the period</p>
+        </div></div>
+        <div class="panel-body">
+            <dl class="ceo-mini">
+                <div><dt>Tables served</dt><dd>{{ tables.orders }}</dd></div>
+                <div><dt>Average stay</dt><dd>{% if tables.avg_stay is not None %}{{ tables.avg_stay|duration }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Turns a table a day</dt><dd>{{ tables.turns|default_if_none:"—" }}</dd></div>
+                <div><dt>Open now</dt><dd>{{ now.open_tables }}/{{ now.table_count }}</dd></div>
+            </dl>
+            {% if tables.busiest %}
+            <p class="ceo-small-title">Busiest tables</p>
+            <ul class="hbar-list hbar-list--tight">
+                {% for row in tables.busiest %}
+                <li title="{{ row.label }}: {{ row.total|inr }}, {{ row.count }} order{{ row.count|pluralize }}">
+                    <span class="hbar-label">{{ row.label }} <small>{{ row.count }}</small></span>
+                    <span class="hbar-track" aria-hidden="true"><span class="hbar-fill" style="width: {{ row.share }}%"></span></span>
+                    <span class="hbar-value">{{ row.total|inr_short }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title"><i class="bi bi-bicycle" aria-hidden="true"></i> Deliveries</h3>
+            <p class="panel-sub">Ordered to the door</p>
+        </div></div>
+        <div class="panel-body">
+            <dl class="ceo-mini">
+                <div><dt>Delivered</dt><dd>{{ delivery.count }}</dd></div>
+                <div><dt>Door to door</dt><dd>{% if delivery.door_avg is not None %}{{ delivery.door_avg|duration }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Average ride</dt><dd>{% if delivery.rides.all.average is not None %}{{ delivery.rides.all.average|duration }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Rejected / cancelled</dt><dd>{{ delivery.cancelled }}</dd></div>
+            </dl>
+            {% include "core/_meter.html" with value=delivery.on_time label="At the door within 45 min" %}
+            {% if delivery.rides.riders %}
+            <p class="ceo-small-title">Riders, quickest first</p>
+            <ul class="ceo-list">
+                {% for row in delivery.rides.riders %}
+                <li data-search="{{ row.rider.name|lower }}"><span>{{ row.rider.name }} <small>{{ row.count }} deliver{{ row.count|pluralize:"y,ies" }}</small></span><strong>{{ row.average|duration }}</strong></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+{# ================================================================ guests and team #}
+<h2 class="ceo-section"><i class="bi bi-people" aria-hidden="true"></i> Guests and team</h2>
+<div class="ceo-grid">
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">Guests</h3>
+            <p class="panel-sub">Known by their mobile number</p>
+        </div></div>
+        <div class="panel-body">
+            {% if guests.known %}
+            <div class="stack-bar" role="img" aria-label="New and returning guests">
+                {% if guests.returning %}<span class="stack-seg viz-1" style="width: {{ guests.returning_share }}%" title="Returning: {{ guests.returning }}"></span>{% endif %}
+                {% if guests.new %}<span class="stack-seg viz-2" style="flex: 1" title="New: {{ guests.new }}"></span>{% endif %}
+            </div>
+            <ul class="ceo-legend">
+                <li><span class="legend-swatch viz-1" aria-hidden="true"></span><span class="ceo-legend-label">Came back</span><strong>{{ guests.returning }}</strong><span class="ceo-legend-share">{{ guests.returning_share }}%</span></li>
+                <li><span class="legend-swatch viz-2" aria-hidden="true"></span><span class="ceo-legend-label">New</span><strong>{{ guests.new }}</strong><span class="ceo-legend-share"></span></li>
+            </ul>
+            {% else %}<p class="dash-empty">No guest mobile numbers in this period.</p>{% endif %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div>
+            <h3 class="panel-title">Bookings</h3>
+            <p class="panel-sub">Table bookings for these days</p>
+        </div></div>
+        <div class="panel-body">
+            <dl class="ceo-mini">
+                <div><dt>Bookings</dt><dd>{{ bookings.count }}</dd></div>
+                <div><dt>Guests</dt><dd>{{ bookings.guests }}</dd></div>
+            </dl>
+            {% include "core/_meter.html" with value=bookings.show_rate label="Turned up (seated vs no-show)" %}
+            {% if bookings.count %}
+            <ul class="hbar-list hbar-list--tight">
+                {% for row in bookings.statuses %}
+                <li><span class="hbar-label">{{ row.label }}</span>
+                    <span class="hbar-track" aria-hidden="true"><span class="hbar-fill" style="width: {{ row.share }}%"></span></span>
+                    <span class="hbar-value">{{ row.total }}</span></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </section>
+
+    {% include "core/_dash_bars.html" with title="Who took the orders" sub="Net sales by waiter, and the guests' own QR orders" rows=staff_sales count_word="bill" searchable=True %}
+    {% include "core/_dash_bars.html" with title="Who took the money" sub="Payments taken by each person: counter and door" rows=collectors count_word="payment" searchable=True %}
+    {% include "core/_dash_bars.html" with title="Busiest hours" sub="Net sales and bills by the hour, the period together" rows=hours count_word="bill" %}
+
+    {% if location_sales %}
+    {% include "core/_dash_bars.html" with title="Every location" sub="Net sales and bills of each location, the same period" rows=location_sales count_word="bill" %}
+    {% endif %}
+</div>
+
+{# ================================================================ what leaks away #}
+<h2 class="ceo-section"><i class="bi bi-droplet-half" aria-hidden="true"></i> What leaks away</h2>
+<section class="ceo-leaks" aria-label="Cancellations and discounts">
+    <div class="ceo-kpi"><span class="ceo-label"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i> Bills cancelled</span>
+        <strong>{{ losses.bills.count }}</strong><span class="delta delta-flat">{{ losses.bills.total|default:0|inr_short }} not collected</span></div>
+    <div class="ceo-kpi"><span class="ceo-label"><i class="bi bi-x-circle" aria-hidden="true"></i> Orders cancelled</span>
+        <strong>{{ losses.orders }}</strong><span class="delta delta-flat">incl. rejected deliveries</span></div>
+    <div class="ceo-kpi"><span class="ceo-label"><i class="bi bi-fire" aria-hidden="true"></i> KOTs cancelled</span>
+        <strong>{{ losses.kots }}</strong><span class="delta delta-flat">food started, then stopped</span></div>
+    <div class="ceo-kpi"><span class="ceo-label"><i class="bi bi-percent" aria-hidden="true"></i> Discounts</span>
+        <strong>{{ figures.discount|inr_short }}</strong>{% include "core/_delta.html" with value=changes.discount up_is_bad=True %}</div>
+</section>
+
+{# ================================================================ latest bills #}
+<section class="panel ceo-bills">
+    <div class="panel-head">
+        <div><h3 class="panel-title">Latest bills</h3><p class="panel-sub">The last 10 of the period</p></div>
+        <a class="btn btn-sm btn-light" href="{% url 'billing:bill_list' %}">Bill register</a>
+    </div>
+    {% if recent_bills %}
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Bill</th><th>For</th><th>Date</th><th class="num">Amount</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for b in recent_bills %}
+                <tr data-search="#{{ b.bill_no }} {{ b.order.place_label|lower }} {{ b.order.customer_name|lower }}">
+                    <td><a href="{% url 'billing:bill_detail' b.pk %}"><strong>#{{ b.bill_no }}</strong></a></td>
+                    <td>{{ b.order.place_label }}</td>
+                    <td>{{ b.created_at|date:"d M, h:i A" }}</td>
+                    <td class="num">{{ b.grand_total|inr }}</td>
+                    <td>{% include "billing/_bill_status.html" with bill=b %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}<div class="panel-body"><p class="dash-empty">No bills in this period yet.</p></div>{% endif %}
+</section>
+</div>

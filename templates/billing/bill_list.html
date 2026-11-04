@@ -1,0 +1,53 @@
+{% extends "base_staff.html" %}
+{% load money %}
+
+{% block title %}Bills{% endblock %}
+{% block crumbs %}<span>/</span><span>Billing</span><span>/</span><span>Bills</span>{% endblock %}
+{% block page_title %}Bills{% endblock %}
+
+{% block page_actions %}
+{# a counter sale billed straight away: pick dishes, then the bill opens for discount and payment #}
+{% if can_bill %}<a class="btn btn-primary" href="{% url 'billing:bill_new' %}"><i class="bi bi-receipt" aria-hidden="true"></i> New bill</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+{# the plan's bills for this membership year: a warning from 90%, "upgrade" once used (core/plans.py) #}
+{% with usage=current_restaurant.plan_usage %}
+{% if usage.near %}
+<div class="alert {% if usage.full %}alert-danger{% else %}alert-warning{% endif %} plan-alert" role="alert">
+    <i class="bi bi-{% if usage.full %}x-octagon{% else %}exclamation-triangle{% endif %}" aria-hidden="true"></i>
+    <div>
+        <strong>{% if usage.full %}This year's bills are used up{% else %}{{ usage.left|indian }} bill{{ usage.left|pluralize }} left this year{% endif %}</strong>
+        <span>{{ usage.bills|indian }} of {{ usage.limit|indian }} bills on the {{ current_restaurant.get_tier_display }} plan
+            ({{ usage.start|date:"d M Y" }} – {{ usage.end|date:"d M Y" }}).
+            {% if usage.full %}New bills cannot be made. {% endif %}Upgrade your plan for more: contact us.</span>
+    </div>
+</div>
+{% endif %}
+{% endwith %}
+
+{# the orders still waiting for their bill, then the register of bills made #}
+{% include "billing/_to_bill.html" %}
+
+<section class="panel">
+    <form id="billFilters" class="panel-toolbar" role="search"
+          hx-get="{% url 'billing:bill_rows' %}" hx-target="#billRows" hx-trigger="input delay:400ms, change, submit">
+        <div class="date-range">
+            <label class="visually-hidden" for="{{ form.date_from.id_for_label }}">From</label>
+            {{ form.date_from }}
+            <span aria-hidden="true">to</span>
+            <label class="visually-hidden" for="{{ form.date_to.id_for_label }}">To</label>
+            {{ form.date_to }}
+        </div>
+        {{ form.status }}
+        <div class="search-box">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input type="search" name="q" class="form-control" placeholder="Bill no., guest or table…" aria-label="Search bills" autocomplete="off">
+        </div>
+    </form>
+
+    <div id="billRows">
+        {% include "billing/_bill_rows.html" %}
+    </div>
+</section>
+{% endblock %}

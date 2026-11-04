@@ -1,0 +1,65 @@
+{% load money %}
+{% comment %}
+One KOT on the kitchen board: no prices, big quantities, the note, one big button.
+Four parts, laid out by CSS (section 10, "kitchen board"):
+  a wide column: one row   ->  table info | dishes | time + buttons
+  a narrow one:  stacked   ->  table info + time / dishes / buttons
+{% endcomment %}
+<article class="kot-card{% if kot.is_late %} is-late{% endif %}{% if kot.order.is_parcel %} is-parcel{% endif %}"
+         aria-label="KOT {{ kot.kot_no }}, {% if kot.order.is_delivery %}delivery{% elif kot.order.is_takeaway %}take away{% else %}table {{ kot.order.table }}{% endif %}">
+    <div class="kot-info">
+        {% if kot.order.is_delivery %}
+        <span class="kot-card-table"><i class="bi bi-bicycle" aria-hidden="true"></i> Delivery #{{ kot.order.order_no }}</span>
+        <span class="parcel-tag parcel-tag--delivery">DELIVERY</span>
+        {% elif kot.order.is_takeaway %}
+        <span class="kot-card-table"><i class="bi bi-bag-check" aria-hidden="true"></i> Parcel #{{ kot.order.order_no }}</span>
+        <span class="parcel-tag">TAKE AWAY</span>
+        {% else %}
+        <span class="kot-card-table">{{ kot.order.table }}</span>
+        {% endif %}
+        <strong class="kot-card-no">KOT #{{ kot.kot_no }}</strong>
+    </div>
+
+    <div class="kot-card-time">
+        {% if kot.status == "READY" %}
+        <span><i class="bi bi-bell" aria-hidden="true"></i> ready {{ kot.ready_min|duration }}</span>
+        {% else %}
+        <span{% if kot.is_late %} class="is-late-text"{% endif %}><i class="bi bi-clock" aria-hidden="true"></i> {{ kot.age_min|duration }}</span>
+        {% endif %}
+        <small>{{ kot.created_at|time:"h:i A" }}</small>
+    </div>
+
+    <div class="kot-body">
+        <ul class="kot-card-items">
+            {% for line in kot.items.all %}
+            <li{% if line.is_cancelled %} class="is-cancelled"{% endif %}><span class="kot-qty">{{ line.qty }}</span> {{ line.item_name }}</li>
+            {% endfor %}
+        </ul>
+        {% if kot.note %}<p class="kot-note"><i class="bi bi-chat-left-text" aria-hidden="true"></i> {{ kot.note }}</p>{% endif %}
+    </div>
+
+    <footer class="kot-card-actions">
+        {% for action in kot.actions %}
+        {% if action.status == "CANCELLED" %}
+        <button type="button" class="btn btn-sm btn-light btn-danger-soft btn-icon" title="Cancel KOT" aria-label="Cancel KOT {{ kot.kot_no }}"
+                hx-post="{% url 'orders:kot_status' kot.pk action.status %}" hx-vals='{"screen": "kitchen"}'
+                hx-target="#kitchenBoard" hx-swap="outerHTML" hx-confirm="Cancel KOT #{{ kot.kot_no }}?">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+        {% else %}
+        <button type="button" class="btn btn-primary kot-main-btn"
+                hx-post="{% url 'orders:kot_status' kot.pk action.status %}" hx-vals='{"screen": "kitchen"}'
+                hx-target="#kitchenBoard" hx-swap="outerHTML">
+            {% if action.status == "PREPARING" %}<i class="bi bi-fire" aria-hidden="true"></i>{% else %}<i class="bi bi-check2" aria-hidden="true"></i>{% endif %}
+            {{ action.label }}
+        </button>
+        {% endif %}
+        {% endfor %}
+        {% if kot.status == "READY" %}<span class="kot-wait">{% if kot.order.is_delivery %}Waiting for the rider{% else %}Waiting for a waiter{% endif %}</span>{% endif %}
+        {% if can_print %}
+        <a class="btn btn-sm btn-light btn-icon" href="{% url 'orders:kot_print' kot.pk %}" target="_blank" rel="noopener"
+           data-print="kot" data-print-slip="{% url 'orders:kot_print_slip' kot.pk %}" data-print-name="KOT #{{ kot.kot_no }}"
+           title="Print KOT" aria-label="Print KOT {{ kot.kot_no }}"><i class="bi bi-printer" aria-hidden="true"></i></a>
+        {% endif %}
+    </footer>
+</article>

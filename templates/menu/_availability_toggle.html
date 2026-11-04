@@ -1,0 +1,14 @@
+{% comment %}
+In stock / Out of stock switch. Flipping it posts to menu_item_toggle,
+which saves and sends this switch back (it replaces itself).
+Also used by the kitchen screen in Phase 4.
+{% endcomment %}
+<form class="stock-toggle" hx-post="{% url 'menu:menu_item_toggle' item.pk %}" hx-trigger="change" hx-swap="outerHTML">
+    <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" role="switch" name="available" value="1"
+               id="stock-{{ item.pk }}"{% if item.is_available %} checked{% endif %}>
+        <label class="form-check-label {% if item.is_available %}text-success-emphasis{% else %}text-danger-emphasis{% endif %}" for="stock-{{ item.pk }}">
+            {% if item.is_available %}In stock{% else %}Out of stock{% endif %}
+        </label>
+    </div>
+</form>

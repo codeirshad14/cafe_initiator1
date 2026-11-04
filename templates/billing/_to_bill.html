@@ -1,0 +1,41 @@
+{% load money %}
+{% comment %}
+Bills page: the orders still waiting for their bill (tables eating, parcels,
+deliveries), oldest first, each with Make bill (not for a waiter: amounts
+only). Asks again every 15 seconds.
+{% endcomment %}
+<section id="toBill" class="panel to-bill" hx-get="{% url 'billing:bills_to_make' %}" hx-trigger="every 15s, liveChanged from:body" hx-swap="outerHTML">
+    <div class="panel-head">
+        <div>
+            <h2 class="panel-title"><i class="bi bi-hourglass-split" aria-hidden="true"></i> To bill <span class="kitchen-count to-bill-count">{{ to_bill|length }}</span></h2>
+            <p class="panel-sub">{% if to_bill %}Orders still waiting for their bill · {{ to_bill_amount|inr_short }} before GST{% else %}Every running order has its bill.{% endif %}</p>
+        </div>
+    </div>
+    {% if to_bill %}
+    <div class="to-bill-grid">
+        {% for o in to_bill %}
+        <article class="to-bill-card{% if o.is_delivery %} to-bill-card--delivery{% elif o.is_takeaway %} to-bill-card--parcel{% endif %}">
+            <div class="to-bill-top">
+                <span class="to-bill-icon"><i class="bi {% if o.is_delivery %}bi-bicycle{% elif o.is_takeaway %}bi-bag-check{% else %}bi-grid-3x3-gap{% endif %}" aria-hidden="true"></i></span>
+                <div class="to-bill-what">
+                    <strong>{% if o.is_parcel %}{{ o.place_label }}{% else %}{{ o.table.name }}{% endif %} · #{{ o.order_no }}</strong>
+                    <small>{{ o.customer_name }}</small>
+                </div>
+                <strong class="to-bill-amount tnum">{{ o.amount|inr_short }}</strong>
+            </div>
+            <div class="to-bill-meta">
+                <span><i class="bi bi-clock" aria-hidden="true"></i> <span class="text-nowrap">{{ o.minutes|duration }}</span></span>
+                <span>{{ o.rounds }} round{{ o.rounds|pluralize }}</span>
+                {% if o.cooking %}<span class="status-badge status-warning">{{ o.cooking }} cooking</span>{% endif %}
+                {% if o.ready %}<span class="status-badge status-info">{{ o.ready }} ready</span>{% endif %}
+                {% if not o.cooking and not o.ready %}<span class="status-badge status-success">All served</span>{% endif %}
+            </div>
+            <div class="to-bill-actions">
+                <a class="btn btn-sm btn-light" href="{% if o.is_parcel %}{% url 'orders:floor_order' o.pk %}{% else %}{% url 'orders:floor_table' o.table_id %}?order={{ o.pk }}{% endif %}">View</a>
+                {% if can_bill %}<a class="btn btn-sm btn-primary" href="{% url 'billing:bill_create' o.pk %}"><i class="bi bi-receipt" aria-hidden="true"></i> Make bill</a>{% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>

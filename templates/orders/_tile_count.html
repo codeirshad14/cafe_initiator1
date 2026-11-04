@@ -1,0 +1,2 @@
+{# how many of this dish are in the round (all sizes together): the red count on its tile #}
+<span class="pos-tile-qty" id="tileqty-{{ item.pk }}"{% if not item.cart_total %} hidden{% endif %}{% if oob %} hx-swap-oob="true"{% endif %}>{{ item.cart_total|default:"" }}</span>

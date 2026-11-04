@@ -1,0 +1,33 @@
+{% comment %}
+"Delete this?" in the side panel (core.utils.delete_with_confirm).
+When other records still use it, `blocked` explains why it cannot go.
+{% endcomment %}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">Delete {{ what|lower }}</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+
+<form class="side-panel-form" hx-post="{{ request.path }}" hx-target="#panel">
+    <div class="side-panel-body">
+        {% if blocked %}
+        <div class="confirm-box confirm-box--blocked" role="alert">
+            <span class="confirm-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
+            <strong>“{{ obj }}” cannot be deleted</strong>
+            <p>{{ blocked }}</p>
+        </div>
+        {% else %}
+        <div class="confirm-box">
+            <span class="confirm-icon"><i class="bi bi-trash3" aria-hidden="true"></i></span>
+            <strong>Delete “{{ obj }}”?</strong>
+            <p>This cannot be undone.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="side-panel-foot">
+        <button type="button" class="btn btn-light" data-bs-dismiss="offcanvas">{% if blocked %}Close{% else %}Keep it{% endif %}</button>
+        {% if not blocked %}
+        <button type="submit" class="btn btn-danger"><i class="bi bi-trash3" aria-hidden="true"></i> Delete</button>
+        {% endif %}
+    </div>
+</form>

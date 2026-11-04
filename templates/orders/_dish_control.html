@@ -1,0 +1,37 @@
+{% comment %}
+The + (or − 1 +) on a dish card of the guest menu.
+  single-price dish: + adds one; then − 1 + (posts to cart_add / cart_remove,
+                     which send this control back: it replaces itself)
+  dish with sizes:   + opens the dish details to choose Qtr / Half / Full;
+                     a small number shows how many are already in the order
+Needs: item (with .sizes, .cart_qty, .cart_total), table. oob=True when sent
+"out of band" after adding from the details sheet.
+{% endcomment %}
+<div class="gm-ctl" id="ctl-{{ item.pk }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if not item.is_available %}
+    {# sold out: the card says so; no button #}
+    {% elif item.sizes %}
+    <button type="button" class="gm-plus{% if item.cart_total %} has-count{% endif %}" aria-label="Choose a size of {{ item.name }}"
+            hx-get="{% url 'orders:dish_detail' table.qr_token item.pk %}" hx-target="#sheet">
+        <span aria-hidden="true">Add</span> <i class="bi bi-plus-lg" aria-hidden="true"></i>
+        {% if item.cart_total %}<span class="gm-count" aria-label="{{ item.cart_total }} in your order">{{ item.cart_total }}</span>{% endif %}
+    </button>
+    {% elif item.cart_qty %}
+    <div class="gm-stepper" role="group" aria-label="Quantity of {{ item.name }}">
+        <button type="button" aria-label="One less {{ item.name }}"
+                hx-post="{% url 'orders:cart_remove' table.qr_token item.pk %}" hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+            <i class="bi bi-dash" aria-hidden="true"></i>
+        </button>
+        <span aria-live="polite">{{ item.cart_qty }}</span>
+        <button type="button" aria-label="One more {{ item.name }}"
+                hx-post="{% url 'orders:cart_add' table.qr_token item.pk %}" hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+            <i class="bi bi-plus" aria-hidden="true"></i>
+        </button>
+    </div>
+    {% else %}
+    <button type="button" class="gm-plus" aria-label="Add {{ item.name }}"
+            hx-post="{% url 'orders:cart_add' table.qr_token item.pk %}" hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+        <span aria-hidden="true">Add</span> <i class="bi bi-plus-lg" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+</div>

@@ -1,0 +1,12 @@
+{% load money %}
+{# the bill's bottom lines; redrawn by HTMX while the discount is typed #}
+<dl id="billTotals" class="bill-totals">
+    <div><dt>Subtotal</dt><dd>{{ totals.subtotal|inr }}</dd></div>
+    {% if totals.discount_amount %}<div class="is-discount"><dt>Discount</dt><dd>&minus; {{ totals.discount_amount|inr }}</dd></div>{% endif %}
+    {% if totals.delivery_charge %}<div><dt>Delivery charge</dt><dd>{{ totals.delivery_charge|inr }}</dd></div>{% endif %}
+    <div><dt>Taxable amount</dt><dd>{{ totals.taxable_amount|inr }}</dd></div>
+    <div><dt>CGST {{ totals.half_percent|percent }}%</dt><dd>{{ totals.cgst_amount|inr }}</dd></div>
+    <div><dt>SGST {{ totals.half_percent|percent }}%</dt><dd>{{ totals.sgst_amount|inr }}</dd></div>
+    <div><dt>Round off</dt><dd>{{ totals.round_off|inr }}</dd></div>
+    <div class="bill-grand"><dt>Grand total</dt><dd>{{ totals.grand_total|inr }}</dd></div>
+</dl>

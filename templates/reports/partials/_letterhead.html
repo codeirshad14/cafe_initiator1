@@ -1,0 +1,10 @@
+{# printed reports start with the company and cafe details, like the CSV and PDF (reports/exports/letterhead.py) #}
+<header class="report-letterhead">
+    <strong class="report-letterhead-name">{{ letterhead.name }}</strong>
+    {% if letterhead.trade_name %}<span>{{ letterhead.trade_name }}</span>{% endif %}
+    {% for line in letterhead.lines %}<span>{{ line }}</span>{% endfor %}
+    <div class="report-letterhead-title">
+        <strong>{{ report_title|default:report.title }}</strong>
+        <span>{{ period_text }}{% if letterhead.location %} · {{ letterhead.location }}{% endif %}</span>
+    </div>
+</header>

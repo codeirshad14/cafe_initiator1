@@ -1,0 +1,30 @@
+# systemd service for the Django app (Gunicorn).
+# Copy to /etc/systemd/system/resto.service, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now resto
+# Logs: sudo journalctl -u resto -f
+#
+# Paths assume the project lives in /srv/resto and runs as user "resto".
+# Change them here if yours differ.
+
+[Unit]
+Description=Mr Cafe (Gunicorn)
+After=network.target postgresql.service
+
+[Service]
+User=resto
+Group=www-data
+WorkingDirectory=/srv/resto
+# /run/resto/ is made fresh at every start, owned by User above
+RuntimeDirectory=resto
+ExecStart=/srv/resto/venv/bin/gunicorn resto.wsgi:application \
+    --bind unix:/run/resto/gunicorn.sock \
+    --umask 007 \
+    --workers 3 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

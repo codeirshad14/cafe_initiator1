@@ -1,0 +1,35 @@
+{% comment %}
+An add / edit form shown in the right side panel (#panel in base_staff.html).
+
+A form partial extends this and lists its fields:
+
+    {% extends "partials/_panel_form.html" %}
+    {% block fields %}
+        {% include "partials/_field.html" with field=form.name %}
+    {% endblock %}
+
+The view passes form, title and submit_label. The form posts back to the
+same URL it was loaded from:
+  - errors  -> the view returns this partial again, showing the messages
+  - success -> the view returns core.utils.htmx_saved(...) and the panel closes
+{% endcomment %}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">{{ title }}</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+
+<form class="side-panel-form" hx-post="{{ request.path }}" hx-target="#panel"{% block form_attrs %}{% endblock %} novalidate>
+    <div class="side-panel-body">
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>
+        {% endif %}
+        {% block fields %}{% endblock %}
+    </div>
+
+    <div class="side-panel-foot">
+        <button type="button" class="btn btn-light" data-bs-dismiss="offcanvas">Cancel</button>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2" aria-hidden="true"></i> {{ submit_label }}
+        </button>
+    </div>
+</form>

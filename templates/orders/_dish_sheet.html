@@ -1,0 +1,8 @@
+{# the dish details over the menu: slides up on phones, a centred card on bigger screens (static/js/menu.js) #}
+<div class="gm-sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="gm-sheet-backdrop" data-sheet-close></div>
+    <div class="gm-sheet-panel">
+        <span class="gm-sheet-grip" aria-hidden="true"></span>
+        {% include "orders/_dish_details.html" with in_sheet=True %}
+    </div>
+</div>

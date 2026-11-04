@@ -1,0 +1,50 @@
+{% comment %}
+Left menu. Desktop: always visible, and folds down to icons with the button in
+the top bar (html.nav-collapsed; each icon then shows its name on hover).
+Phone / tablet (below 992px): a Bootstrap offcanvas drawer opened by the ☰ button.
+The links and the roles that see them live in core/navigation.py.
+{% endcomment %}
+<aside class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Main menu">
+    <div class="sidebar-inner">
+        <div class="sidebar-brand">
+            <span class="brand-mark" aria-hidden="true"><i class="bi bi-qr-code-scan"></i></span>
+            <div class="brand-text">
+                <strong title="{{ current_restaurant.name }}">{{ current_restaurant.name }}</strong>
+                <small>{{ brand_name }}</small>
+            </div>
+            <button type="button" class="btn-close btn-close-white d-lg-none ms-auto"
+                    data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close menu"></button>
+        </div>
+
+        <nav class="sidebar-nav">
+            {% for section in nav_sections %}
+            <div class="nav-section"><span>{{ section.title }}</span></div>
+            {% for link in section.links %}
+            {# data-nav-tip: the name shown on hover while the menu is folded #}
+            {% if link.url %}
+            <a href="{{ link.url }}" class="nav-item{% if link.is_active %} active{% endif %}" data-nav-tip="{{ link.label }}"
+               {% if link.is_active %}aria-current="page"{% endif %}>
+                <i class="bi bi-{{ link.icon }}" aria-hidden="true"></i>
+                <span class="nav-label">{{ link.label }}</span>
+            </a>
+            {% else %}
+            <span class="nav-item is-soon" aria-disabled="true" data-nav-tip="{{ link.label }} (soon)">
+                <i class="bi bi-{{ link.icon }}" aria-hidden="true"></i>
+                <span class="nav-label">{{ link.label }}</span>
+                <em class="nav-soon">Soon</em>
+            </span>
+            {% endif %}
+            {% endfor %}
+            {% endfor %}
+            {# Only Menu: one note instead of the other apps (core/plans.py) #}
+            {% if current_restaurant.menu_only %}
+            <div class="sidebar-upgrade">
+                <i class="bi bi-rocket-takeoff" aria-hidden="true"></i>
+                <strong>Only Menu plan</strong>
+                <span>Upgrade for QR ordering, Kitchen, Bills and Reports. Contact us.</span>
+            </div>
+            {% endif %}
+        </nav>
+        {# the membership is in the account menu, top right (partials/_topbar.html) #}
+    </div>
+</aside>

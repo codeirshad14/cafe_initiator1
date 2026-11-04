@@ -1,0 +1,28 @@
+{% load money %}
+{% comment %}
+"Which bill?" for a dine-in round, when the table already has an open order.
+Friends share one bill (the default); someone else at the same table can pick
+"My own bill" and gets an order of their own. Sends bill = order id or "new".
+Needs: open_orders, default_order, my_order (guest) or nothing (waiter).
+{% endcomment %}
+{% if open_orders %}
+<fieldset class="bill-choice" data-show-for="DINE_IN">
+    <legend>Which bill?</legend>
+    {% for o in open_orders %}
+    <label class="bill-option">
+        <input type="radio" name="bill" value="{{ o.pk }}"{% if form.bill.value == o.pk|stringformat:"s" or not form.bill.value and o == default_order %} checked{% endif %}>
+        <span>
+            <strong>{% if my_order and o == my_order %}Add to my order #{{ o.order_no }}{% else %}Add to order #{{ o.order_no }} · {{ o.customer_name }}{% endif %}</strong>
+            <small>One bill together</small>
+        </span>
+    </label>
+    {% endfor %}
+    <label class="bill-option">
+        <input type="radio" name="bill" value="new"{% if form.bill.value == "new" or not form.bill.value and not default_order %} checked{% endif %}>
+        <span>
+            <strong>My own order</strong>
+            <small>A separate bill, just for this</small>
+        </span>
+    </label>
+</fieldset>
+{% endif %}
