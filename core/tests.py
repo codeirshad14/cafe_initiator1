@@ -339,43 +339,105 @@ class AdminRestaurantFormTests(TestCase):
         self.free = User.objects.create_user("free@x.test", email="free@x.test", password=PASSWORD)
         self.taken = make_staff(make_restaurant("Blue Bay"), "ADMIN").user  # already staff elsewhere
 
-    def form_data(self, **staff_row):
+    def form_data(self, rows=1, restaurant=None, **staff_row):
         today = timezone.localdate().isoformat()
         data = {
             "name": "Spice Garden", "slug": "spice-garden", "gst_percent": "5", "tier": "BASIC", "plan": "MONTHLY",
             "membership_start": today, "membership_end": today, "max_users": "5", "is_active": "on",
-            "staff_members-TOTAL_FORMS": "1", "staff_members-INITIAL_FORMS": "0",
+            # the restaurant admin's login, on the Restaurant tab
+            "email": "Admin@Spice.in", "admin_password": "Spice@2026",
+            "staff_members-TOTAL_FORMS": str(rows), "staff_members-INITIAL_FORMS": "0",
             "staff_members-MIN_NUM_FORMS": "0", "staff_members-MAX_NUM_FORMS": "1000",
-            "staff_members-0-name": "Anil", "staff_members-0-role": "ADMIN", "staff_members-0-is_active": "on",
             # the Locations rows (none added here)
             "locations-TOTAL_FORMS": "0", "locations-INITIAL_FORMS": "0",
             "locations-MIN_NUM_FORMS": "0", "locations-MAX_NUM_FORMS": "1000",
+            **(restaurant or {}),
         }
-        data.update({f"staff_members-0-{key}": value for key, value in staff_row.items()})
+        if rows:
+            data.update({"staff_members-0-name": "Anil", "staff_members-0-role": "MANAGER", "staff_members-0-is_active": "on"})
+            data.update({f"staff_members-0-{key}": value for key, value in staff_row.items()})
         return data
+
+    def staff_of(self, role):
+        return Restaurant.objects.get(slug="spice-garden").staff_members.get(role=role)
 
     def test_user_list_shows_free_logins_only(self):
         response = self.client.get("/admin/core/restaurant/add/")
         self.assertContains(response, "free@x.test")
         self.assertNotContains(response, f'value="{self.taken.pk}"')
+        self.assertContains(response, "Admin login password")
+
+    def test_new_restaurant_gets_its_admin_login_from_its_email(self):
+        response = self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        self.assertEqual(response.status_code, 302, response.content[:2000])
+        admin = self.staff_of("ADMIN")
+        self.assertEqual((admin.user.username, admin.user.email, admin.name), ("admin@spice.in", "admin@spice.in", "Spice Garden"))
+        self.assertTrue(admin.user.check_password("Spice@2026"))
+        login = Client().post("/login/", {"username": "admin@spice.in", "password": "Spice@2026", "as_admin": "on"})
+        self.assertRedirects(login, "/home/", fetch_redirect_response=False)
+
+    def test_new_restaurant_needs_the_email_and_a_good_password(self):
+        for changes, error in (({"email": ""}, "This field is required"), ({"admin_password": ""}, "This field is required"),
+                               ({"admin_password": "12345"}, "too short"), ({"email": "free@x.test"}, "Another login already has")):
+            with self.subTest(changes=changes):
+                self.assertContains(self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0, restaurant=changes)), error)
+        self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
 
     def test_pick_an_existing_login(self):
         response = self.client.post("/admin/core/restaurant/add/", self.form_data(login=self.free.pk))
         self.assertEqual(response.status_code, 302, response.content[:2000])
-        restaurant = Restaurant.objects.get(slug="spice-garden")
-        self.assertEqual(restaurant.staff_members.get().user, self.free)
+        self.assertEqual(self.staff_of("MANAGER").user, self.free)
 
     def test_make_a_new_login_in_the_same_form(self):
         response = self.client.post("/admin/core/restaurant/add/", self.form_data(new_email="Owner@Spice.in", new_password="Owner@2026"))
         self.assertEqual(response.status_code, 302, response.content[:2000])
-        staff = Restaurant.objects.get(slug="spice-garden").staff_members.get()
+        staff = self.staff_of("MANAGER")
         self.assertEqual((staff.user.username, staff.user.email), ("owner@spice.in", "owner@spice.in"))
         self.assertTrue(staff.user.check_password("Owner@2026"))
+
+    def test_a_staff_row_cannot_take_the_admins_email(self):
+        response = self.client.post("/admin/core/restaurant/add/", self.form_data(new_email="admin@spice.in", new_password="Owner@2026"))
+        self.assertContains(response, "This is the restaurant admin&#x27;s login")
+        self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
 
     def test_row_needs_a_login(self):
         response = self.client.post("/admin/core/restaurant/add/", self.form_data())
         self.assertContains(response, "Pick a login from the list")
         self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
+
+    def edit(self, restaurant, **changes):
+        """Save the restaurant's form again in the admin, as it is plus `changes`."""
+        data = self.form_data(rows=0, restaurant={"slug": restaurant.slug, "name": restaurant.name,
+                                                  "email": restaurant.email, "admin_password": "", **changes})
+        data["staff_members-INITIAL_FORMS"] = data["staff_members-TOTAL_FORMS"] = "0"
+        return self.client.post(f"/admin/core/restaurant/{restaurant.pk}/change/", data)
+
+    def test_the_password_box_resets_the_admin_password(self):
+        self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        restaurant = Restaurant.objects.get(slug="spice-garden")
+        self.assertEqual(self.edit(restaurant).status_code, 302)  # empty: kept
+        self.assertTrue(self.staff_of("ADMIN").user.check_password("Spice@2026"))
+        self.assertEqual(self.edit(restaurant, admin_password="Fresh@2027").status_code, 302)
+        self.assertTrue(self.staff_of("ADMIN").user.check_password("Fresh@2027"))
+
+    def test_a_new_email_moves_the_login_only_when_changed_here(self):
+        self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        restaurant = Restaurant.objects.get(slug="spice-garden")
+        self.assertEqual(self.edit(restaurant, email="boss@spice.in").status_code, 302)
+        self.assertEqual(self.staff_of("ADMIN").user.username, "boss@spice.in")
+        # the cafe put another contact email in Cafe profile: saving the admin form keeps the login
+        Restaurant.objects.filter(pk=restaurant.pk).update(email="hello@spice.in")
+        restaurant.refresh_from_db()
+        self.assertEqual(self.edit(restaurant).status_code, 302)
+        self.assertEqual(self.staff_of("ADMIN").user.username, "boss@spice.in")
+        self.assertContains(self.edit(restaurant, email="free@x.test"), "Another login already has")
+
+    def test_an_older_restaurant_without_admin_gets_one(self):
+        old = make_restaurant("Old Cafe", email="old@cafe.in")
+        self.assertEqual(self.edit(old).status_code, 302)  # no password: nothing made
+        self.assertIsNone(old.admin_login())
+        self.assertEqual(self.edit(old, admin_password="Old@20260").status_code, 302)
+        self.assertEqual(old.admin_login().user.email, "old@cafe.in")
 
 
 class RoleAndLimitTests(TestCase):

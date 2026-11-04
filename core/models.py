@@ -286,6 +286,12 @@ class Restaurant(models.Model):
         """One more active login fits in the plan."""
         return self.active_users < self.max_users
 
+    def admin_login(self):
+        """The restaurant admin's login (Staff, role Admin; the first made), or None.
+        A new restaurant gets it from its email in the Django admin (core/admin.py)."""
+        return (self.staff_members.filter(role=Staff.Role.ADMIN).select_related("user")
+                .order_by("created_at", "pk").first())
+
     def user_limit_message(self):
         """What the restaurant admin is told when every allowed login is in use."""
         s = "s" if self.max_users != 1 else ""

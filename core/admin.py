@@ -35,7 +35,8 @@ class StaffAdminForm(forms.ModelForm):
         queryset=User.objects.none(), required=False, label="Login (user)",
         help_text="Pick an existing login, or leave empty and fill in the new email + password.",
     )
-    new_email = forms.EmailField(required=False, label="or new login: email")
+    new_email = forms.EmailField(required=False, label="or new login: email",
+                                 widget=forms.EmailInput(attrs={"autocomplete": "off"}))
     new_password = forms.CharField(
         required=False, label="password", strip=False,
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}),
@@ -64,7 +65,11 @@ class StaffAdminForm(forms.ModelForm):
         if not login and not email:
             raise forms.ValidationError("Pick a login from the list, or type a new email and password.")
         if email:
-            if User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
+            restaurant_email = (self.data.get("email") or "").strip().lower()  # the Restaurant tab, same page
+            if self.prefix and email == restaurant_email:
+                self.add_error("new_email", "This is the restaurant admin's login (the email on the Restaurant tab). "
+                                            "Use another email for this staff login.")
+            elif User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
                 self.add_error("new_email", "A login with this email already exists. Pick it from the list instead.")
             if not password:
                 self.add_error("new_password", "Give the new login a password.")
@@ -92,6 +97,97 @@ class StaffAdminForm(forms.ModelForm):
         return staff
 
 
+def login_taken(email, but_not=None):
+    """Another login already has this email (as its email or its username)."""
+    logins = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email))
+    if but_not is not None:
+        logins = logins.exclude(pk=but_not.pk)
+    return logins.exists()
+
+
+class RestaurantAdminForm(forms.ModelForm):
+    """The Restaurant form in the Django admin, with the restaurant admin's login in it.
+
+    The restaurant's email IS its admin's login: a new restaurant gets that login
+    (role Admin) with the password typed here, so the restaurant can log in at once.
+    Later the password box sets a new password, and a new email moves the login along.
+    A restaurant without an admin login yet (made before) gets one when a password is typed.
+    The other logins are the Staff tab's.
+    """
+
+    admin_password = forms.CharField(
+        required=False, label="Admin login password", strip=False,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "class": "vTextField"}),
+    )
+
+    class Meta:
+        model = Restaurant
+        fields = "__all__"
+        # vTextField: the admin's own look for text boxes; autocomplete off: the browser must not
+        # fill in the developer's own saved login here
+        widgets = {"email": forms.EmailInput(attrs={"autocomplete": "off", "class": "vTextField"})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.admin_staff = self.instance.admin_login() if self.instance.pk else None
+        self.fields["email"].label = "Email (the restaurant admin's login)"
+        if self.admin_staff:
+            self.fields["email"].help_text = (
+                f"The restaurant admin logs in with this email (now {self.admin_staff.user.email}). "
+                "Change it here to change the login.")
+            self.fields["admin_password"].help_text = "Leave empty to keep the password. Type a new one to reset it."
+        elif self.instance.pk:
+            self.fields["email"].help_text = "No restaurant admin login yet: type a password below to make one with this email."
+            self.fields["admin_password"].help_text = "Makes the restaurant admin login with the email above."
+        else:
+            self.fields["email"].required = True
+            self.fields["email"].help_text = "The restaurant admin logs in with this email (and ticks “Sign in as restaurant admin”)."
+            self.fields["admin_password"].required = True
+            self.fields["admin_password"].help_text = "The restaurant admin's password. Other logins: the Staff tab."
+
+    def moves_login(self, email):
+        """The admin login gets this email: a new login is made, or the email was changed here
+        (not when the cafe changed its own email in Cafe profile and this form is only saved)."""
+        if self.admin_staff is None:
+            return bool(self.cleaned_data.get("admin_password"))
+        return "email" in self.changed_data and email != self.admin_staff.user.email.lower()
+
+    def clean(self):
+        cleaned = super().clean()
+        email = (cleaned.get("email") or "").strip().lower()
+        password = cleaned.get("admin_password")
+        if "email" in cleaned:
+            cleaned["email"] = email
+        if password and not email:
+            self.add_error("email", "Type the email the restaurant admin logs in with.")
+        elif self.admin_staff and "email" in self.changed_data and not email:
+            self.add_error("email", "The email is the restaurant admin's login, so it cannot be empty.")
+        elif email and self.moves_login(email) and login_taken(email, but_not=self.admin_staff and self.admin_staff.user):
+            self.add_error("email", "Another login already has this email. Use another email for the restaurant admin.")
+        if password:
+            try:
+                validate_password(password)
+            except forms.ValidationError as error:
+                self.add_error("admin_password", error)
+        return cleaned
+
+    def save_admin_login(self, restaurant):
+        """After the restaurant is saved: make its admin login, or bring its email and password up to date."""
+        email, password = self.cleaned_data.get("email"), self.cleaned_data.get("admin_password")
+        if self.admin_staff is None:
+            if password:
+                user = User.objects.create_user(username=email, email=email, password=password,
+                                                first_name=restaurant.name[:150])
+                Staff.objects.create(user=user, restaurant=restaurant, name=restaurant.name, role=Staff.Role.ADMIN)
+            return
+        user = self.admin_staff.user
+        if self.moves_login(email):
+            user.email = user.username = email
+        if password:
+            user.set_password(password)
+        user.save()
+
+
 class StaffInline(admin.TabularInline):
     """The restaurant's logins, right in the Restaurant form."""
 
@@ -112,12 +208,14 @@ class LocationInline(admin.TabularInline):
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     """The membership is set and renewed here only; the restaurant's own screens never edit it.
+    The email and password on the Restaurant tab are the restaurant admin's login (RestaurantAdminForm).
 
     "Membership type" (Only Menu ... Ultimate: core/plans.py) and "Logins allowed" can
     be changed right in the list. Lowering them never switches anything off: "Active
     logins", "Bills this year" and "Open locations" just show what is over, in red.
     """
 
+    form = RestaurantAdminForm
     list_display = [
         "name", "tier", "plan", "membership_end", "membership_ok", "max_users", "logins_in_use",
         "bills_this_year", "open_locations", "is_active", "created_at",
@@ -128,7 +226,8 @@ class RestaurantAdmin(admin.ModelAdmin):
     date_hierarchy = "membership_end"
     prepopulated_fields = {"slug": ["name"]}
     fieldsets = [
-        ("Restaurant", {"fields": ["name", "slug", "address", "phone", "email", "gstin", "gst_percent", "fssai_no", "logo"]}),
+        ("Restaurant", {"fields": ["name", "slug", "email", "admin_password", "address", "phone", "gstin", "gst_percent",
+                                   "fssai_no", "logo"]}),
         ("Delivery & bookings", {
             "fields": ["delivery_enabled", ("delivery_charge", "free_delivery_above"), "booking_enabled"],
         }),
@@ -150,6 +249,10 @@ class RestaurantAdmin(admin.ModelAdmin):
                 filter=Q(staff_members__is_active=True, staff_members__user__is_active=True),
             ),
         )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        form.save_admin_login(obj)  # the email on the Restaurant tab is the restaurant admin's login
 
     @admin.display(boolean=True, description="Membership active")
     def membership_ok(self, obj):
