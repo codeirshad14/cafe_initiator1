@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "billing",
     "reports",
     "web",  # the public one-page website
+    "pwa",  # the installable app: manifest, service worker, offline page, Install button
 ]
 
 MIDDLEWARE = [

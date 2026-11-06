@@ -86,6 +86,20 @@ sudo certbot --nginx -d order.example.com       # HTTPS + redirect, renews itsel
 Open `https://order.example.com/`: you should see the website. `/login/` is
 for staff, and `/admin/` is where you (the developer) set up restaurants and memberships.
 
+## The installable app (phone and desktop)
+
+Staff can install Mr Cafe as an app: **Install app** in the top bar (on phones: the
+account menu), **Get the app** on the website, or the button on the login page.
+It opens in its own window with the Mr Cafe icon, on Android, iPhone, Windows, Mac and Linux.
+
+- It needs **HTTPS** (step 6). On plain `http://` the button simply does not show.
+- Nothing to set in Nginx: `/manifest.webmanifest`, `/sw.js` and `/offline/` come from Django.
+- After each update `collectstatic` (step 4) is enough: open apps pick up the new
+  version on their next start. Pages and orders are never stored on the device,
+  only CSS, JS and icons.
+- Icons: `static/img/app/`. After changing the mark or the brand red, run
+  `python manage.py make_app_icons`, then `collectstatic`.
+
 ## A new restaurant
 
 1. `/admin/` > Restaurants > Add: the name, its web address (slug), the restaurant admin's

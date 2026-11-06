@@ -19,6 +19,7 @@ urlpatterns = [
     path("tables/", include("tables.urls")),
     path("billing/", include("billing.urls")),
     path("reports/", include("reports.urls")),
+    path("", include("pwa.urls")),     # the installable app: /manifest.webmanifest, /sw.js, /offline/
     path("", include("web.urls")),     # public website at /
     path("", include("orders.urls")),  # customer QR pages: /m/<token>/, /track/<token>/
     path("", include("core.urls")),    # /home/, /dashboard/, /staff/

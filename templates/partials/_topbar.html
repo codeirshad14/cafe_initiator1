@@ -20,6 +20,11 @@
     </div>
 
     <div class="topbar-actions">
+        {# install Mr Cafe as an app (phone, tablet, desktop): shows only where it can (static/js/install.js) #}
+        <button type="button" class="install-btn" data-install-app hidden title="Install {{ brand_name }} on this device">
+            <i class="bi bi-download" aria-hidden="true"></i><span>Install app</span>
+        </button>
+
         {# the bell: new orders at this location (orders/_notification_bell.html), filled in at once #}
         {% if not current_restaurant.menu_only %}
         <div id="notifyBell" hx-get="{% url 'orders:notification_bell' %}" hx-trigger="load" hx-swap="outerHTML">
@@ -89,6 +94,10 @@
                     </div>
                 </div>
                 <div class="dropdown-divider"></div>
+                {# phones: Install app lives here (no room in the bar); hidden once installed #}
+                <button type="button" class="dropdown-item install-menu-item d-sm-none" data-install-app hidden>
+                    <i class="bi bi-download" aria-hidden="true"></i> Install app
+                </button>
                 {% if user.is_superuser %}
                 <a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Django admin</a>
                 {% endif %}

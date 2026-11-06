@@ -6,6 +6,7 @@
     <title>Staff login · {{ brand_name }}</title>
     <meta name="theme-color" content="#da3831">
     <meta name="color-scheme" content="light">
+    {% include "pwa/_head.html" %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -83,9 +84,15 @@
         </form>
 
         <p class="auth-help">Forgot your password? Ask your restaurant admin to reset it from the Staff page.</p>
+        {# install the app on this phone / computer (static/js/install.js shows it where it can) #}
+        <button type="button" class="btn btn-light w-100 auth-install" data-install-app hidden>
+            <i class="bi bi-download" aria-hidden="true"></i> Install the {{ brand_name }} app on this device
+        </button>
         <p class="auth-help"><a href="{% url 'web:home' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back to the website</a></p>
     </section>
 </main>
+{% include "pwa/_install_help.html" %}
+<script src="{% static 'js/install.js' %}"></script>
 
 <script>
     // show / hide the password

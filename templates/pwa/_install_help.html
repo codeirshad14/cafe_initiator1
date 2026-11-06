@@ -1,0 +1,31 @@
+{% load static %}
+{# "Install app" where the browser has no install prompt (iPhone, iPad, Safari on a Mac): #}
+{# how to add it by hand. static/js/install.js opens it and shows the part for this device. #}
+<dialog class="install-help" id="installHelp" aria-labelledby="installHelpTitle">
+    <div class="install-help-head">
+        <img src="{% static 'img/app/icon-192.png' %}" alt="" width="48" height="48">
+        <div>
+            <h2 id="installHelpTitle">Install {{ brand_name }}</h2>
+            <p>Open it from your home screen like any app.</p>
+        </div>
+    </div>
+
+    <ol class="install-help-steps" data-install-for="ios">
+        <li>Tap <strong>Share</strong> <i class="bi bi-box-arrow-up" aria-hidden="true"></i> in Safari's bar.</li>
+        <li>Scroll down, tap <strong>Add to Home Screen</strong> <i class="bi bi-plus-square" aria-hidden="true"></i>.</li>
+        <li>Tap <strong>Add</strong>. The {{ brand_name }} icon is now on your home screen.</li>
+    </ol>
+    <ol class="install-help-steps" data-install-for="mac">
+        <li>In Safari's menu bar, open <strong>File</strong>.</li>
+        <li>Choose <strong>Add to Dock</strong>, then <strong>Add</strong>.</li>
+        <li>{{ brand_name }} opens from the Dock in its own window.</li>
+    </ol>
+    <ol class="install-help-steps" data-install-for="other">
+        <li>Open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
+        <li>Open the browser menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>, choose <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</li>
+    </ol>
+
+    <form method="dialog">
+        <button type="submit" class="btn btn-primary w-100">OK</button>
+    </form>
+</dialog>
