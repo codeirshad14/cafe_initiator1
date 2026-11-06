@@ -990,3 +990,39 @@ class BillSettingsTests(TestCase):
         slip = self.admin.get(f"/billing/{self.bill.pk}/print/slip/").content
         self.assertNotIn(b"\x1dv0\x00", slip)
         self.assertNotIn(b"UPI", slip)
+
+
+class ServerUpdateSafetyTests(TestCase):
+    """After a `git pull` without collectstatic no page answers 500, and check_setup says so."""
+
+    def setUp(self):
+        import json
+        import os
+        import tempfile
+        from resto.storage import FingerprintedStaticStorage
+        root = tempfile.mkdtemp(prefix="resto-static-")
+        os.makedirs(os.path.join(root, "css"))
+        open(os.path.join(root, "css", "app.abc123.css"), "w").close()
+        with open(os.path.join(root, "staticfiles.json"), "w") as manifest:  # an old collectstatic
+            json.dump({"version": "1.1", "paths": {"css/app.css": "css/app.abc123.css"}}, manifest)
+        self.storage = FingerprintedStaticStorage(location=root, base_url="/static/")
+
+    def test_a_file_not_collected_keeps_its_plain_name_instead_of_error_500(self):
+        self.assertEqual(self.storage.url("css/app.css"), "/static/css/app.abc123.css")
+        with self.assertLogs("resto.storage", "WARNING") as log:
+            self.assertEqual(self.storage.url("img/app/favicon-32.png"), "/static/img/app/favicon-32.png")
+        self.assertIn("collectstatic", log.output[0])
+        self.assertEqual(self.storage.url("vendor/bootswatch"), "/static/vendor/bootswatch")  # Jazzmin's folder
+
+    def test_check_setup_lists_files_not_collected_and_opens_the_pages(self):
+        from io import StringIO
+        from unittest import mock
+        from django.core.management import call_command
+        out = StringIO()
+        with mock.patch("core.management.commands.check_setup.staticfiles_storage", self.storage):
+            with self.assertRaises(SystemExit):
+                call_command("check_setup", stdout=out)
+        text = out.getvalue()
+        self.assertIn("static file(s) not collected yet", text)
+        for url in ("/", "/login/", "/manifest.webmanifest", "/sw.js", "/offline/"):
+            self.assertIn(f"OK    {url} opens", text)

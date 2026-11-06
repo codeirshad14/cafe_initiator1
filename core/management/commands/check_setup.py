@@ -6,8 +6,10 @@ go in). It checks what the app needs there and prints OK or FAIL, with the fix:
 
   settings     DEBUG, SECRET_KEY, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS
   database     it answers, and every migration is applied
-  files        the static files were collected; media/ and the cache can be written
-  logins       every restaurant has an admin login that can sign in (its own email,
+  files        the static files were collected (also the new ones after a git pull);
+               media/ and the cache can be written
+  pages        the website, the login page and the app files open without error 500
+  logins      every restaurant has an admin login that can sign in (its own email,
                a password, switched on, membership running), and no email belongs
                to two logins (then neither can sign in)
 
@@ -19,6 +21,7 @@ import tempfile
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.cache import cache
 from django.core.management.base import BaseCommand
@@ -27,6 +30,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.models import Count
 from django.db.models.functions import Lower
 from django.template.loader import render_to_string
+from django.test import Client
 
 from core.models import Restaurant, Staff
 
@@ -36,10 +40,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.failed = 0
-        for part in (self.check_settings, self.check_database, self.check_files, self.check_logins):
+        for part in (self.check_settings, self.check_database, self.check_files, self.check_pages, self.check_logins):
             part()
         if self.failed:
-            self.stdout.write(self.style.ERROR(f"\n{self.failed} problem(s). Fix them, then: sudo systemctl restart resto"))
+            self.stdout.write(self.style.ERROR(f"\n{self.failed} problem(s). Fix them, then: sudo bash deploy/update.sh"))
             raise SystemExit(1)
         self.stdout.write(self.style.SUCCESS("\nAll good."))
 
@@ -110,6 +114,7 @@ class Command(BaseCommand):
             self.ok(f"static files found (css/app.css -> {url})")
         except Exception as error:
             self.fail(f"static files: {error}", "python manage.py collectstatic --noinput")
+        self.check_collected()
         for name, folder in (("media (photos, logos)", settings.MEDIA_ROOT),
                              ("cache (wrong-password counts)", settings.CACHES["default"].get("LOCATION") or "")):
             if not folder or not os.path.isabs(str(folder)):
@@ -133,6 +138,39 @@ class Command(BaseCommand):
             self.ok("error pages render")
         except Exception as error:
             self.fail(f"the 500 page cannot render: {error}", "python manage.py collectstatic --noinput")
+
+    def check_collected(self):
+        """Every static file of the code is in collectstatic's list (a `git pull` brought new
+        ones: icons, scripts). Only on the server, where names get a fingerprint."""
+        collected = getattr(staticfiles_storage, "hashed_files", None)
+        if collected is None:
+            return  # development: files are served straight from static/
+        missing = sorted({path.replace("\\", "/")
+                          for finder in finders.get_finders()
+                          for path, _ in finder.list(["CVS", ".*", "*~"])} - set(collected))
+        if missing:
+            self.fail(f"{len(missing)} static file(s) not collected yet, e.g. {', '.join(missing[:3])}",
+                      "python manage.py collectstatic --noinput")
+        else:
+            self.ok("every static file is collected")
+
+    # ------------------------------------------------------------ pages
+    def check_pages(self):
+        """Open the public pages as a browser would (inside this command, no internet needed)."""
+        self.head("Pages")
+        hosts = [host for host in settings.ALLOWED_HOSTS if host not in ("127.0.0.1", "localhost", "*")]
+        browser = Client(HTTP_HOST=(hosts or ["localhost"])[0].lstrip("."))
+        for url in ("/", "/login/", "/manifest.webmanifest", "/sw.js", "/offline/"):
+            try:
+                status = browser.get(url, secure=True).status_code
+            except Exception as error:
+                self.fail(f"{url} answers 500: {type(error).__name__}: {str(error).splitlines()[0][:160]}",
+                          "the line above names the cause; also: sudo journalctl -u <service> -n 50")
+                continue
+            if status == 200:
+                self.ok(f"{url} opens")
+            else:
+                self.fail(f"{url} answers {status}", "check ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS in .env")
 
     # ------------------------------------------------------------ logins
     def check_logins(self):

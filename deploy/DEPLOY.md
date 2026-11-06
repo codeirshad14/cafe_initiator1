@@ -160,11 +160,17 @@ the backups off the server too, and back up `/srv/resto/media/` (menu photos).
 
 ## Updating to a new version
 
+One command, from the project folder, after every push:
+
 ```bash
-sudo -u resto -H bash -c 'cd /srv/resto && git pull && venv/bin/pip install -r requirements.txt \
-  && venv/bin/python manage.py migrate && venv/bin/python manage.py collectstatic --noinput'
-sudo systemctl restart resto
+sudo bash deploy/update.sh            # or: sudo bash deploy/update.sh cafe1
 ```
+
+It finds the service, its user and its Python by itself, then: `git pull`, packages,
+makes the folders the app writes (static, media, cache) belong to the app's user,
+`migrate`, `collectstatic`, restart, and `check_setup`. It ends with "Updated" or with
+the FAIL lines and their fixes. Never skip it for a plain `git pull` + restart: a new
+file without `collectstatic`, or a migration without `migrate`, is what broke pages before.
 
 ## When something is wrong
 
@@ -176,6 +182,6 @@ sudo systemctl restart resto
 | "CSRF verification failed" | `CSRF_TRUSTED_ORIGINS` needs `https://your-domain` |
 | QR opens the wrong address | `SITE_URL`, then print the QR sheet again |
 | Photo upload fails | dish photos are up to 5 MB; `client_max_body_size 8M` in Nginx; `media/` must be writable by `resto` |
-| Every page is error 500 after an update | `collectstatic` was not run (the fingerprinted CSS is missing) |
+| Every page is error 500 after an update | run `sudo bash deploy/update.sh` (it does `migrate` and `collectstatic`), then read its check |
 | "Too many wrong passwords" | wait 15 minutes, or empty the project's `cache/` folder to let everyone try again |
 | A login will not go in | `python manage.py check_setup` (an email used by two logins, no password, membership ended …) |
