@@ -1,0 +1,44 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Feedback{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><a href="{% url 'core:restaurant_settings' %}">Cafe profile</a><span>/</span><span>Feedback</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% block page_actions %}
+<a class="btn btn-light" href="{% url 'web:cafe' restaurant.slug %}#contact" target="_blank" rel="noopener">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> The feedback form
+</a>
+{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="feedback" %}
+<div class="split-grid">
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">What guests wrote</h2>
+                <p class="panel-sub">From the feedback form on your website. “Show on website” puts one under “What our guests say”.</p>
+            </div>
+        </div>
+        <div id="feedbackRows">{% include "web/_feedback_rows.html" %}</div>
+    </section>
+
+    <aside class="bill-side">
+        <section class="panel">
+            <div class="panel-head"><h2 class="panel-title">Your rating</h2></div>
+            <div class="panel-body">
+                {% if total %}
+                <p class="rating-big"><strong>{{ average }}</strong> <i class="bi bi-star-fill" aria-hidden="true"></i> <small>from {{ total }} guest{{ total|pluralize }}</small></p>
+                <ul class="rating-bars">
+                    {% for bar in bars %}
+                    <li><span>{{ bar.stars }} <i class="bi bi-star-fill" aria-hidden="true"></i></span><span class="rating-bar"><span style="width: {{ bar.share }}%"></span></span><span class="tnum">{{ bar.count }}</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="form-hint mb-0">Your rating shows here once guests send feedback.</p>
+                {% endif %}
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

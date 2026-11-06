@@ -99,6 +99,17 @@ def item_cart_total(cart, item, sizes):
     return cart.get(line_key(item), 0)
 
 
+def with_counts(item, cart):
+    """Ready one dish's buttons after a tap, as menu_with_cart does for the whole menu:
+    its sizes (in menu order) and how many of the dish, and of each size, are in the cart."""
+    item.sizes = list(item.portions.all())
+    item.cart_qty = cart.get(line_key(item), 0)
+    for portion in item.sizes:
+        portion.cart_qty = cart.get(line_key(item, portion), 0)
+    item.cart_total = item_cart_total(cart, item, item.sizes)
+    return item
+
+
 def keep_orderable_only(request, table, details):
     """Write back only the lines that can still be ordered (after cart_details found dropped ones)."""
     write_cart(request, table, {line["key"]: line["qty"] for line in details["lines"]})

@@ -1,0 +1,98 @@
+{% extends "base_staff.html" %}
+
+{% block title %}Website{% endblock %}
+{% block crumbs %}<span>/</span><span>Setup</span><span>/</span><a href="{% url 'core:restaurant_settings' %}">Cafe profile</a><span>/</span><span>Website</span>{% endblock %}
+{% block page_title %}Cafe profile{% endblock %}
+
+{% block page_actions %}
+<a class="btn btn-light" href="{{ site_url }}" target="_blank" rel="noopener">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open my website
+</a>
+{% endblock %}
+
+{% block content %}
+{% include "core/_profile_tabs.html" with tab="website" %}
+<div class="split-grid">
+    <form method="post" enctype="multipart/form-data" class="panel" novalidate>
+        {% csrf_token %}
+        <div class="panel-head">
+            <div>
+                <h2 class="panel-title">Your website</h2>
+                <p class="panel-sub">One page for your cafe, to share anywhere. Your name, logo, address, phone, menu,
+                    locations and slider photos come from the rest of your profile by themselves.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            {% include "partials/_field.html" with field=form.is_on %}
+
+            <p class="form-section">At the top</p>
+            {% include "partials/_field.html" with field=form.tagline %}
+            {% if website.cover %}
+            <div class="photo-current photo-current--wide">
+                <img src="{{ website.cover.url }}" alt="Current cover photo">
+                <span>Current cover photo. Choose a new file to replace it.</span>
+            </div>
+            {% endif %}
+            {% include "partials/_field.html" with field=form.cover %}
+            {% if form.remove_cover %}{% include "partials/_field.html" with field=form.remove_cover %}{% endif %}
+
+            <p class="form-section">About your cafe</p>
+            {% include "partials/_field.html" with field=form.about %}
+            {% include "partials/_field.html" with field=form.opening_hours %}
+
+            {# the highlights: ticks in a grid, each a chip on the page #}
+            <div class="field-block{% if form.highlight_choices.errors %} has-error{% endif %}">
+                <span class="form-label">{{ form.highlight_choices.label }}</span>
+                <div class="check-list">
+                    {% for box in form.highlight_choices %}
+                    <label class="form-check">{{ box.tag }} <span class="form-check-label">{{ box.choice_label }}</span></label>
+                    {% endfor %}
+                </div>
+                <div class="form-text">{{ form.highlight_choices.help_text }}</div>
+            </div>
+
+            <p class="form-section">Contact &amp; social</p>
+            {% include "partials/_field.html" with field=form.whatsapp %}
+            <div class="field-row">
+                {% include "partials/_field.html" with field=form.instagram %}
+                {% include "partials/_field.html" with field=form.facebook %}
+            </div>
+
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2" aria-hidden="true"></i> Save website</button>
+        </div>
+    </form>
+
+    <aside class="bill-side">
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">Your address on the web</h2>
+                    <p class="panel-sub">Share it on WhatsApp, Instagram, Google Maps or your visiting card.</p>
+                </div>
+                {% if website.is_on %}<span class="status-badge status-success">On</span>{% else %}<span class="status-badge status-muted">Off</span>{% endif %}
+            </div>
+            <div class="panel-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" value="{{ site_url }}" readonly aria-label="Your website's address">
+                    <button type="button" class="btn btn-light" data-copy="{{ site_url }}"><i class="bi bi-copy" aria-hidden="true"></i> Copy</button>
+                </div>
+                <a class="btn btn-light w-100 mt-2" href="{{ site_url }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Open it</a>
+            </div>
+        </section>
+        <section class="panel">
+            <div class="panel-head"><h2 class="panel-title">On the page</h2></div>
+            <div class="panel-body">
+                <ul class="site-checklist">
+                    <li class="{% if website.tagline or website.cover %}is-done{% endif %}"><i class="bi bi-image" aria-hidden="true"></i> Name, line and cover photo</li>
+                    <li class="{% if website.about %}is-done{% endif %}"><i class="bi bi-book" aria-hidden="true"></i> Your story{% if restaurant.slides %} and slider photos{% endif %}</li>
+                    <li class="is-done"><i class="bi bi-journal-text" aria-hidden="true"></i> Your menu, with sizes and prices <a href="{% url 'menu:menu_item_list' %}">Menu items</a></li>
+                    <li class="is-done"><i class="bi bi-geo-alt" aria-hidden="true"></i> Your locations, with directions <a href="{% url 'core:location_list' %}">Locations</a></li>
+                    <li class="{% if website.opening_hours %}is-done{% endif %}"><i class="bi bi-clock" aria-hidden="true"></i> Opening hours</li>
+                    <li class="is-done"><i class="bi bi-chat-heart" aria-hidden="true"></i> A feedback form; you pick which to show <a href="{% url 'web:feedback_list' %}">Feedback</a></li>
+                </ul>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

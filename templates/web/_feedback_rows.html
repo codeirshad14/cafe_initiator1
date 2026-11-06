@@ -1,0 +1,14 @@
+{# the feedback list and its pages (100 a page): redrawn by the pager (web.views.feedback_list) #}
+{% if items %}
+<div class="feedback-list">
+    {% for item in items %}{% include "web/_feedback_item.html" %}{% endfor %}
+</div>
+{% url 'web:feedback_list' as rows_url %}
+{% include "partials/_pager.html" with pager=pager target="#feedbackRows" what="messages" one="message" %}
+{% else %}
+<div class="empty-state">
+    <span class="empty-icon"><i class="bi bi-chat-heart" aria-hidden="true"></i></span>
+    <h3>No feedback yet</h3>
+    <p>Share your website: guests leave stars and a message at the bottom of it.</p>
+</div>
+{% endif %}

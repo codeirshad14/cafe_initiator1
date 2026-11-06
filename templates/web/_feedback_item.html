@@ -1,0 +1,18 @@
+{# one guest's feedback in Cafe profile > Feedback; "Show on website" redraws just this (web.views.feedback_show) #}
+<article class="feedback-item{% if item.pk in unread %} is-new{% endif %}" id="feedback-{{ item.pk }}">
+    <header>
+        <span class="cafe-stars" aria-label="{{ item.rating }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= item.rating %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span>
+        {% if item.pk in unread %}<span class="status-badge status-brand">New</span>{% endif %}
+        <small>{{ item.created_at|date:"d M Y, h:i A" }}</small>
+    </header>
+    <p>{{ item.message|linebreaksbr }}</p>
+    <footer>
+        <span class="feedback-who"><i class="bi bi-person" aria-hidden="true"></i> {{ item.name }}{% if item.phone %} · <a href="tel:{{ item.phone }}">{{ item.phone }}</a>{% endif %}</span>
+        <button type="button" class="btn btn-sm {% if item.show_on_site %}btn-primary{% else %}btn-light{% endif %}"
+                hx-post="{% url 'web:feedback_show' item.pk %}" hx-target="#feedback-{{ item.pk }}" hx-swap="outerHTML"
+                aria-pressed="{% if item.show_on_site %}true{% else %}false{% endif %}">
+            <i class="bi {% if item.show_on_site %}bi-eye-fill{% else %}bi-eye{% endif %}" aria-hidden="true"></i>
+            {% if item.show_on_site %}Shown on website{% else %}Show on website{% endif %}
+        </button>
+    </footer>
+</article>

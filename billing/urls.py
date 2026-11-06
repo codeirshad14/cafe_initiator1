@@ -17,6 +17,11 @@ urlpatterns = [
     path("create/<int:order_id>/", views.bill_create, name="bill_create"),
     path("<int:pk>/", views.bill_detail, name="bill_detail"),
     path("<int:pk>/pay/", views.payment_add, name="payment_add"),
+    # UPI QR with the amount: the panel, its picture, the customer screen, "Paid by UPI"
+    path("<int:pk>/upi/", views.bill_upi, name="bill_upi"),
+    path("<int:pk>/upi.png", views.bill_upi_qr, name="bill_upi_qr"),
+    path("<int:pk>/upi/screen/", views.bill_upi_screen, name="bill_upi_screen"),
+    path("<int:pk>/upi/paid/", views.bill_upi_paid, name="bill_upi_paid"),
     path("<int:pk>/payments/<int:payment_id>/remove/", views.payment_remove, name="payment_remove"),
     path("<int:pk>/reopen/", views.bill_reopen, name="bill_reopen"),
     path("<int:pk>/cancel/", views.bill_cancel, name="bill_cancel"),

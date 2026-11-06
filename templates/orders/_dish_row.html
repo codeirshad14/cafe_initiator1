@@ -1,14 +1,16 @@
 {% load money %}
 {% comment %}
 One dish in the guest menu list: a big photo filling the card's height, then
-name, short description, veg / non-veg, prep time / sizes, and a bottom row
-with the price and the + button. Tapping the card opens the dish's details
+name, short description, veg / non-veg, prep time, and a bottom row with the
+price and the Add button. A dish with sizes (Qtr / Half / Full) shows a row of
+size buttons across the card instead, each with its own price; on the view-only
+menu the same row, without buttons. Tapping the card opens the dish's details
 (a sheet over the menu). Needs: item, ordering, table or restaurant.
 {% endcomment %}
 {% if ordering %}{% url 'orders:dish_detail' table.qr_token item.pk as dish_url %}{% else %}{% url 'orders:view_dish' restaurant.slug item.pk as dish_url %}{% endif %}
-<article class="gm-dish{% if not item.is_available %} is-out{% endif %}"
+<article class="gm-dish{% if not item.is_available %} is-out{% endif %}{% if item.sizes %} has-sizes{% endif %}"
          data-name="{{ item.name|lower }} {{ item.description|lower }}" data-food="{{ item.food_type }}">
-    {# the whole card opens the details; the + button sits above this link #}
+    {# the whole card opens the details; the buttons sit above this link #}
     <a class="gm-dish-link" href="{{ dish_url }}" hx-get="{{ dish_url }}" hx-target="#sheet" hx-push-url="false">
         <span class="visually-hidden">{{ item.name }}: see details</span>
     </a>
@@ -21,11 +23,21 @@ with the price and the + button. Tapping the card opens the dish's details
             {# the same chip as the Veg / Non-veg filter: the mark and the word #}
             <span class="gm-food"><span class="food-dot food-{{ item.food_type|lower }}" aria-hidden="true"></span> {{ item.get_food_type_display }}</span>
             {% if item.prep_time %}<span><i class="bi bi-clock" aria-hidden="true"></i> {{ item.prep_time }}</span>{% endif %}
-            {% if item.sizes %}<span><i class="bi bi-layers" aria-hidden="true"></i> {{ item.sizes|length }} sizes</span>{% endif %}
         </div>
+        {% if not item.sizes %}
         <div class="gm-dish-foot">
-            <strong class="gm-price">{% if item.sizes %}<small>from</small> {% endif %}{{ item.price|inr_short }}</strong>
+            <strong class="gm-price">{{ item.price|inr_short }}</strong>
             {% if ordering %}{% include "orders/_dish_control.html" %}{% endif %}
         </div>
+        {% endif %}
     </div>
+    {% if item.sizes %}
+    {% if ordering %}
+    {% include "orders/_dish_control.html" %}
+    {% else %}
+    <div class="gm-portions" role="list" aria-label="Sizes of {{ item.name }}">
+        {% for p in item.sizes %}<span class="gm-portion is-static" role="listitem"><b>{{ p.name }}</b><small>{{ p.price|inr_short }}</small></span>{% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
 </article>

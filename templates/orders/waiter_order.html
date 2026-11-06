@@ -41,22 +41,14 @@ bill lines, plus the tile's count, the total and the phone bar "out of band"
                 {% for item in c.menu_items %}
                 {% if item.sizes %}
                 {% comment %}
-                A dish with sizes: the tile opens a small menu with − qty + for each
-                size (Qtr / Half / Full). It stays open while you adjust; tap outside to close.
+                A dish with sizes: every size on the tile, as on the guest menus, each with its
+                own price and "Add +" (then − qty +). One tap adds one of that size.
                 {% endcomment %}
-                <div class="dropdown pos-tile-box" data-dish data-name="{{ item.name|lower }}" data-food="{{ item.food_type }}">
-                    <button type="button" class="pos-tile food-{{ item.food_type|lower }}{% if not item.is_available %} is-out{% endif %}"
-                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="{{ item.name }}: pick a size"{% if not item.is_available %} disabled{% endif %}>
-                        <span class="pos-tile-name">{% include "partials/_food_dot.html" %} {{ item.name }}</span>
-                        {% if item.is_available %}
-                        <span class="pos-tile-price"><small>{{ item.sizes|length }} size{{ item.sizes|length|pluralize }} · from</small> {{ item.sizes.0.price|inr_short }}</span>
-                        {% else %}
-                        <span class="pos-tile-out">Out of stock</span>
-                        {% endif %}
-                        {% include "orders/_tile_count.html" %}
-                    </button>
-                    <div class="dropdown-menu pos-size-menu">
-                        <p class="pos-size-head">{{ item.name }}</p>
+                <div class="pos-tile pos-tile--sizes food-{{ item.food_type|lower }}{% if not item.is_available %} is-out{% endif %}" data-dish data-name="{{ item.name|lower }}" data-food="{{ item.food_type }}">
+                    <span class="pos-tile-name">{% include "partials/_food_dot.html" %} {{ item.name }}</span>
+                    {% include "orders/_tile_count.html" %}
+                    {% if item.is_available %}
+                    <div class="pos-sizes" role="group" aria-label="Sizes of {{ item.name }}">
                         {% for p in item.sizes %}
                         <div class="pos-size">
                             <span class="pos-size-name"><span>{{ p.name }}</span> <strong>{{ p.price|inr_short }}</strong></span>
@@ -64,6 +56,9 @@ bill lines, plus the tile's count, the total and the phone bar "out of band"
                         </div>
                         {% endfor %}
                     </div>
+                    {% else %}
+                    <span class="pos-tile-out">Out of stock</span>
+                    {% endif %}
                 </div>
                 {% else %}
                 {% comment %}

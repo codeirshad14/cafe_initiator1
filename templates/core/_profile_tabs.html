@@ -1,9 +1,16 @@
 {% comment %}
 Cafe profile tabs (admin and manager: roles.COMPANY). Usage: {% include "core/_profile_tabs.html" with tab="bill" %}
 {% endcomment %}
+{% load cafe_site %}{% unread_feedback current_restaurant as new_feedback %}
 <nav class="profile-tabs" aria-label="Cafe profile">
     <a href="{% url 'core:restaurant_settings' %}" class="profile-tab{% if tab == 'profile' %} is-active{% endif %}"{% if tab == 'profile' %} aria-current="page"{% endif %}>
         <i class="bi bi-shop" aria-hidden="true"></i> Profile
+    </a>
+    <a href="{% url 'web:website_settings' %}" class="profile-tab{% if tab == 'website' %} is-active{% endif %}"{% if tab == 'website' %} aria-current="page"{% endif %}>
+        <i class="bi bi-globe2" aria-hidden="true"></i> Website
+    </a>
+    <a href="{% url 'web:feedback_list' %}" class="profile-tab{% if tab == 'feedback' %} is-active{% endif %}"{% if tab == 'feedback' %} aria-current="page"{% endif %}>
+        <i class="bi bi-chat-heart" aria-hidden="true"></i> Feedback{% if new_feedback %} <span class="tab-count" aria-label="{{ new_feedback }} new">{{ new_feedback }}</span>{% endif %}
     </a>
     <a href="{% url 'core:bill_settings' %}" class="profile-tab{% if tab == 'bill' %} is-active{% endif %}"{% if tab == 'bill' %} aria-current="page"{% endif %}>
         <i class="bi bi-receipt" aria-hidden="true"></i> Bill &amp; print

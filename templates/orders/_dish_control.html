@@ -1,21 +1,47 @@
+{% load money %}
 {% comment %}
-The + (or − 1 +) on a dish card of the guest menu.
-  single-price dish: + adds one; then − 1 + (posts to cart_add / cart_remove,
+The Add button of a dish card in the guest menu (table QR menu, public menu).
+  single-price dish: "Add +" adds one; then − 1 + (posts to cart_add / cart_remove,
                      which send this control back: it replaces itself)
-  dish with sizes:   + opens the dish details to choose Qtr / Half / Full;
-                     a small number shows how many are already in the order
-Needs: item (with .sizes, .cart_qty, .cart_total), table. oob=True when sent
-"out of band" after adding from the details sheet.
+  dish with sizes:   one button per size, "QTR ₹149 +": a tap adds one of that size,
+                     then that size shows − QTR 2 +. The whole row is this control, so
+                     every tap redraws all the sizes (and the details sheet's Add does too)
+Needs: item (with .sizes, each with .cart_qty; .cart_qty, .cart_total), table.
+oob=True when sent "out of band" after adding from the details sheet.
 {% endcomment %}
+{% if item.sizes %}
+<div class="gm-ctl gm-portions" id="ctl-{{ item.pk }}" role="group" aria-label="Sizes of {{ item.name }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% for p in item.sizes %}
+    {% if not item.is_available %}
+    <span class="gm-portion is-static"><b>{{ p.name }}</b><small>{{ p.price|inr_short }}</small></span>
+    {% elif p.cart_qty %}
+    <div class="gm-portion is-on">
+        <button type="button" class="gm-portion-step" aria-label="One less {{ item.name }} {{ p.name }}"
+                hx-post="{% url 'orders:cart_remove' table.qr_token item.pk %}" hx-vals='{"portion": "{{ p.pk }}"}'
+                hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+            <i class="bi bi-dash" aria-hidden="true"></i>
+        </button>
+        <span class="gm-portion-label" aria-live="polite"><b>{{ p.name }}</b><small>× {{ p.cart_qty }}</small></span>
+        <button type="button" class="gm-portion-step" aria-label="One more {{ item.name }} {{ p.name }}"
+                hx-post="{% url 'orders:cart_add' table.qr_token item.pk %}" hx-vals='{"portion": "{{ p.pk }}"}'
+                hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+            <i class="bi bi-plus" aria-hidden="true"></i>
+        </button>
+    </div>
+    {% else %}
+    <button type="button" class="gm-portion" aria-label="Add {{ item.name }} {{ p.name }}, {{ p.price|inr_short }}"
+            hx-post="{% url 'orders:cart_add' table.qr_token item.pk %}" hx-vals='{"portion": "{{ p.pk }}"}'
+            hx-target="#ctl-{{ item.pk }}" hx-swap="outerHTML">
+        <span class="gm-portion-label"><b>{{ p.name }}</b><small>{{ p.price|inr_short }}</small></span>
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+    {% endfor %}
+</div>
+{% else %}
 <div class="gm-ctl" id="ctl-{{ item.pk }}"{% if oob %} hx-swap-oob="true"{% endif %}>
     {% if not item.is_available %}
     {# sold out: the card says so; no button #}
-    {% elif item.sizes %}
-    <button type="button" class="gm-plus{% if item.cart_total %} has-count{% endif %}" aria-label="Choose a size of {{ item.name }}"
-            hx-get="{% url 'orders:dish_detail' table.qr_token item.pk %}" hx-target="#sheet">
-        <span aria-hidden="true">Add</span> <i class="bi bi-plus-lg" aria-hidden="true"></i>
-        {% if item.cart_total %}<span class="gm-count" aria-label="{{ item.cart_total }} in your order">{{ item.cart_total }}</span>{% endif %}
-    </button>
     {% elif item.cart_qty %}
     <div class="gm-stepper" role="group" aria-label="Quantity of {{ item.name }}">
         <button type="button" aria-label="One less {{ item.name }}"
@@ -35,3 +61,4 @@ Needs: item (with .sizes, .cart_qty, .cart_total), table. oob=True when sent
     </button>
     {% endif %}
 </div>
+{% endif %}

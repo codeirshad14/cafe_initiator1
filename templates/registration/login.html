@@ -30,6 +30,14 @@
         <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %} py-2">{{ message }}</div>
         {% endfor %}
 
+        {# on the server the login only works over https://: say so instead of failing quietly #}
+        {% if cookies_need_https and not request.is_secure %}
+        <div class="alert alert-warning py-2" role="alert">
+            <strong>Open this page with https://</strong> to log in:
+            <a href="https://{{ request.get_host }}{% url 'login' %}">https://{{ request.get_host }}{% url 'login' %}</a>
+        </div>
+        {% endif %}
+
         {% if form.non_field_errors %}
         <div class="alert alert-danger py-2" role="alert">
             {% for error in form.non_field_errors %}{{ error }}{% endfor %}

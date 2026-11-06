@@ -12,6 +12,17 @@
 {% endblock %}
 
 {% block content %}
+{# a new cafe: the profile first (address and phone go on every bill), then the staff logins #}
+{% if first_time %}
+<div class="onboard-steps" role="status">
+    <span class="onboard-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
+    <div>
+        <strong>Welcome to {{ brand_name }}, {{ restaurant.name }}! Step 1 of 2: your cafe profile</strong>
+        <p>Fill in your {{ restaurant.profile_missing|join:" and " }} (and GSTIN, FSSAI and logo if you have them) and save.
+           Step 2: add your staff logins (cashier, waiter, kitchen, rider…) in Staff.</p>
+    </div>
+</div>
+{% endif %}
 {% include "core/_profile_tabs.html" with tab="profile" %}
 <div class="split-grid">
     <form method="post" enctype="multipart/form-data" class="panel" novalidate>
@@ -85,6 +96,24 @@
                     <input type="text" class="form-control" value="{{ public_menu_url }}" readonly aria-label="Public menu address">
                     <button type="button" class="btn btn-light" data-copy="{{ public_menu_url }}"><i class="bi bi-copy" aria-hidden="true"></i> Copy</button>
                 </div>
+            </div>
+        </section>
+
+        {# the cafe's own one-page website (Website tab) #}
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <h2 class="panel-title">Your cafe website</h2>
+                    <p class="panel-sub">Your own page: story, menu, locations, contacts and a feedback form.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% url 'web:cafe' restaurant.slug as cafe_path %}
+                <div class="input-group">
+                    <input type="text" class="form-control" value="{{ request.scheme }}://{{ request.get_host }}{{ cafe_path }}" readonly aria-label="Your website's address">
+                    <button type="button" class="btn btn-light" data-copy="{{ request.scheme }}://{{ request.get_host }}{{ cafe_path }}"><i class="bi bi-copy" aria-hidden="true"></i> Copy</button>
+                </div>
+                <a class="btn btn-light w-100 mt-2" href="{% url 'web:website_settings' %}"><i class="bi bi-pencil" aria-hidden="true"></i> Edit what it says</a>
             </div>
         </section>
 

@@ -69,6 +69,11 @@ data-balance: static/js/billing.js works out the change for cash live.
         <div class="panel-body">
             {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
 
+            {# the guest pays by UPI: a QR code with the balance in it (billing.views.bill_upi), then one tap records it #}
+            <button type="button" class="btn btn-light w-100 upi-show" hx-get="{% url 'billing:bill_upi' bill.pk %}" hx-target="#panel">
+                <i class="bi bi-qr-code" aria-hidden="true"></i> Show UPI QR for {{ bill.balance|inr }}
+            </button>
+
             {# payment 1 #}
             <div class="pay-part">
                 <p class="pay-part-title" data-split-only>Payment 1</p>

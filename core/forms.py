@@ -1,3 +1,4 @@
+import logging
 import re
 from decimal import Decimal
 
@@ -18,6 +19,23 @@ FSSAI_CHECK = RegexValidator(r"^[0-9]{14}$", "The FSSAI licence number is 14 dig
 MAX_LOGO_MB = 1
 # password guessing: after this many wrong passwords for one email, its logins wait this long
 LOGIN_TRIES, LOGIN_WAIT_MINUTES = 5, 15
+logger = logging.getLogger(__name__)
+
+
+def count_wrong_password(tries_key):
+    try:
+        cache.incr(tries_key)
+    except ValueError:  # the first wrong one (or the wait just ended)
+        cache.set(tries_key, 1, LOGIN_WAIT_MINUTES * 60)
+
+
+def tries_counted(action, *args):
+    """Run one step of the wrong-password count; 0 (and a line in the log) when the cache fails."""
+    try:
+        return action(*args)
+    except Exception:  # e.g. PermissionError on the cache folder: never an error 500 at login
+        logger.exception("The login cache could not be used (CACHE_DIR). Logins go on without the count.")
+        return 0
 
 
 def add_bootstrap_classes(form):
@@ -71,20 +89,19 @@ class StaffLoginForm(AuthenticationForm):
         add_bootstrap_classes(self)
 
     def clean(self):
-        """Count wrong passwords per email (Django's cache); a good login clears the count."""
+        """Count wrong passwords per email (Django's cache); a good login clears the count.
+        The count must never stop a login: when the cache cannot be used (its folder
+        missing or not writable on the server), logins go on without it and the log says so."""
         tries_key = "login-tries:" + (self.data.get("username") or "").strip().lower()
-        if cache.get(tries_key, 0) >= LOGIN_TRIES:
+        if tries_counted(cache.get, tries_key, 0) >= LOGIN_TRIES:
             raise forms.ValidationError(self.error_messages["too_many_tries"], code="too_many_tries")
         try:
             cleaned = super().clean()
         except forms.ValidationError as error:
             if error.code == "invalid_login":
-                try:
-                    cache.incr(tries_key)
-                except ValueError:  # the first wrong one (or the wait just ended)
-                    cache.set(tries_key, 1, LOGIN_WAIT_MINUTES * 60)
+                tries_counted(count_wrong_password, tries_key)
             raise
-        cache.delete(tries_key)
+        tries_counted(cache.delete, tries_key)
         return cleaned
 
     def confirm_login_allowed(self, user):
@@ -159,6 +176,8 @@ class RestaurantForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field, _ in Restaurant.PROFILE_NEEDS:  # printed on every bill: the profile is not done without them
+            self.fields[field].required = True
         if not self.instance.logo:
             del self.fields["remove_logo"]
         for n in Restaurant.SLIDE_SLOTS:

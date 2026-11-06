@@ -52,12 +52,19 @@
                     <span>
                         <i class="bi {% if choice.data.value == 'TAKEAWAY' %}bi-bag{% elif choice.data.value == 'DELIVERY' %}bi-bicycle{% else %}bi-cup-hot{% endif %}" aria-hidden="true"></i>
                         <strong>{{ choice.choice_label }}</strong>
-                        <small>{% if choice.data.value == 'TAKEAWAY' %}Packed to take with you{% elif choice.data.value == 'DELIVERY' %}Brought to your door{% else %}Served at your table{% endif %}</small>
+                        <small>{% if choice.data.value == 'TAKEAWAY' %}Packed to take with you{% elif choice.data.value == 'DELIVERY' %}Brought to your door{% elif table.is_takeaway %}Eat here with us{% else %}Served at your table{% endif %}</small>
                     </span>
                 </label>
                 {% endfor %}
             </div>
         </fieldset>
+        {% endif %}
+
+        {# the public menu, Dine in: the guest's table, or none (the Common table) #}
+        {% if "table" in form.fields %}
+        <div data-show-for="DINE_IN">
+            {% include "partials/_field.html" with field=form.table %}
+        </div>
         {% endif %}
 
         {% include "orders/_bill_choice.html" %}

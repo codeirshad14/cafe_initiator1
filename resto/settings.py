@@ -198,6 +198,8 @@ JAZZMIN_SETTINGS = {
         "billing.payment": "fas fa-rupee-sign",
         "billing.offer": "fas fa-percent",
         "web.demorequest": "fas fa-headset",
+        "web.cafewebsite": "fas fa-globe",
+        "web.feedback": "fas fa-comment-dots",
     },
     "default_icon_parents": "fas fa-folder",
     "default_icon_children": "fas fa-circle",

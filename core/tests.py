@@ -149,6 +149,13 @@ class LoginTests(TestCase):
         cache.clear()  # the 15 minutes are over
         self.assertEqual(self.login(email).status_code, 302)
 
+    def test_the_login_page_asks_for_https_when_the_cookie_needs_it(self):
+        from django.test import override_settings
+        self.assertNotContains(Client().get("/login/"), "Open this page with https://")  # this PC
+        with override_settings(SESSION_COOKIE_SECURE=True):
+            self.assertContains(Client().get("/login/"), "Open this page with https://")
+            self.assertNotContains(Client().get("/login/", secure=True), "Open this page with https://")
+
     def test_a_good_login_clears_the_count(self):
         from django.core.cache import cache
         cache.clear()
@@ -329,7 +336,8 @@ class MembershipTypeTests(TestCase):
 
 
 class AdminRestaurantFormTests(TestCase):
-    """Django admin (developer only): the Restaurant form lists logins and can make a new one."""
+    """Django admin (developer only): a new restaurant with its admin login and membership.
+    The cafe's admin fills in the profile and adds the staff logins in the app."""
 
     def setUp(self):
         from django.contrib.auth.models import User
@@ -339,36 +347,24 @@ class AdminRestaurantFormTests(TestCase):
         self.free = User.objects.create_user("free@x.test", email="free@x.test", password=PASSWORD)
         self.taken = make_staff(make_restaurant("Blue Bay"), "ADMIN").user  # already staff elsewhere
 
-    def form_data(self, rows=1, restaurant=None, **staff_row):
+    def form_data(self, restaurant=None):
         today = timezone.localdate().isoformat()
-        data = {
+        return {
             "name": "Spice Garden", "slug": "spice-garden", "gst_percent": "5", "tier": "BASIC", "plan": "MONTHLY",
             "membership_start": today, "membership_end": today, "max_users": "5", "is_active": "on",
-            # the restaurant admin's login, on the Restaurant tab
+            # the restaurant admin's login, on the first tab
             "email": "Admin@Spice.in", "admin_password": "Spice@2026",
-            "staff_members-TOTAL_FORMS": str(rows), "staff_members-INITIAL_FORMS": "0",
-            "staff_members-MIN_NUM_FORMS": "0", "staff_members-MAX_NUM_FORMS": "1000",
-            # the Locations rows (none added here)
+            # the Locations rows on Change (none added here)
             "locations-TOTAL_FORMS": "0", "locations-INITIAL_FORMS": "0",
             "locations-MIN_NUM_FORMS": "0", "locations-MAX_NUM_FORMS": "1000",
             **(restaurant or {}),
         }
-        if rows:
-            data.update({"staff_members-0-name": "Anil", "staff_members-0-role": "MANAGER", "staff_members-0-is_active": "on"})
-            data.update({f"staff_members-0-{key}": value for key, value in staff_row.items()})
-        return data
 
     def staff_of(self, role):
         return Restaurant.objects.get(slug="spice-garden").staff_members.get(role=role)
 
-    def test_user_list_shows_free_logins_only(self):
-        response = self.client.get("/admin/core/restaurant/add/")
-        self.assertContains(response, "free@x.test")
-        self.assertNotContains(response, f'value="{self.taken.pk}"')
-        self.assertContains(response, "Admin login password")
-
     def test_new_restaurant_gets_its_admin_login_from_its_email(self):
-        response = self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        response = self.client.post("/admin/core/restaurant/add/", self.form_data())
         self.assertEqual(response.status_code, 302, response.content[:2000])
         admin = self.staff_of("ADMIN")
         self.assertEqual((admin.user.username, admin.user.email, admin.name), ("admin@spice.in", "admin@spice.in", "Spice Garden"))
@@ -380,40 +376,53 @@ class AdminRestaurantFormTests(TestCase):
         for changes, error in (({"email": ""}, "This field is required"), ({"admin_password": ""}, "This field is required"),
                                ({"admin_password": "12345"}, "too short"), ({"email": "free@x.test"}, "Another login already has")):
             with self.subTest(changes=changes):
-                self.assertContains(self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0, restaurant=changes)), error)
+                self.assertContains(self.client.post("/admin/core/restaurant/add/", self.form_data(restaurant=changes)), error)
         self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
 
-    def test_pick_an_existing_login(self):
-        response = self.client.post("/admin/core/restaurant/add/", self.form_data(login=self.free.pk))
-        self.assertEqual(response.status_code, 302, response.content[:2000])
-        self.assertEqual(self.staff_of("MANAGER").user, self.free)
+    def test_add_asks_only_what_we_set(self):
+        """Add: the restaurant, its admin login and the membership; the cafe fills in the rest itself."""
+        page = self.client.get("/admin/core/restaurant/add/").content.decode()
+        for ours in ('name="name"', 'name="slug"', 'name="email"', 'name="admin_password"', 'name="tier"', 'name="membership_end"'):
+            self.assertIn(ours, page)
+        for theirs in ('name="address"', 'name="gstin"', 'name="logo"', "staff_members-TOTAL_FORMS", "locations-TOTAL_FORMS"):
+            self.assertNotIn(theirs, page)
+        self.client.post("/admin/core/restaurant/add/", self.form_data())
+        change = self.client.get(f"/admin/core/restaurant/{Restaurant.objects.get(slug='spice-garden').pk}/change/")
+        self.assertContains(change, 'name="gstin"')  # shown later, to help the cafe when it asks
+        self.assertNotContains(change, "staff_members-TOTAL_FORMS")  # the cafe adds its own staff
 
-    def test_make_a_new_login_in_the_same_form(self):
-        response = self.client.post("/admin/core/restaurant/add/", self.form_data(new_email="Owner@Spice.in", new_password="Owner@2026"))
-        self.assertEqual(response.status_code, 302, response.content[:2000])
-        staff = self.staff_of("MANAGER")
-        self.assertEqual((staff.user.username, staff.user.email), ("owner@spice.in", "owner@spice.in"))
-        self.assertTrue(staff.user.check_password("Owner@2026"))
+    def staff_page(self, **row):
+        """The Django admin's own Staff page (support only): one staff login for Blue Bay."""
+        data = {"restaurant": self.taken.staff.restaurant.pk, "name": "Anil", "role": "MANAGER", "is_active": "on", **row}
+        return self.client.post("/admin/core/staff/add/", data)
 
-    def test_a_staff_row_cannot_take_the_admins_email(self):
-        response = self.client.post("/admin/core/restaurant/add/", self.form_data(new_email="admin@spice.in", new_password="Owner@2026"))
-        self.assertContains(response, "This is the restaurant admin&#x27;s login")
-        self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
+    def test_staff_page_lists_free_logins_only(self):
+        response = self.client.get("/admin/core/staff/add/")
+        self.assertContains(response, "free@x.test")
+        self.assertNotContains(response, f'value="{self.taken.pk}"')
 
-    def test_row_needs_a_login(self):
-        response = self.client.post("/admin/core/restaurant/add/", self.form_data())
-        self.assertContains(response, "Pick a login from the list")
-        self.assertFalse(Restaurant.objects.filter(slug="spice-garden").exists())
+    def test_staff_page_picks_an_existing_login(self):
+        self.assertEqual(self.staff_page(login=self.free.pk).status_code, 302)
+        self.assertEqual(self.free.staff.role, "MANAGER")
+
+    def test_staff_page_makes_a_new_login(self):
+        self.assertEqual(self.staff_page(new_email="Owner@Spice.in", new_password="Owner@2026").status_code, 302)
+        user = self.User.objects.get(email="owner@spice.in")
+        self.assertEqual(user.username, "owner@spice.in")
+        self.assertTrue(user.check_password("Owner@2026"))
+
+    def test_staff_page_refuses_a_taken_email_and_needs_a_login(self):
+        self.assertContains(self.staff_page(new_email=self.taken.email, new_password="Owner@2026"), "already exists")
+        self.assertContains(self.staff_page(), "Pick a login from the list")
 
     def edit(self, restaurant, **changes):
         """Save the restaurant's form again in the admin, as it is plus `changes`."""
-        data = self.form_data(rows=0, restaurant={"slug": restaurant.slug, "name": restaurant.name,
-                                                  "email": restaurant.email, "admin_password": "", **changes})
-        data["staff_members-INITIAL_FORMS"] = data["staff_members-TOTAL_FORMS"] = "0"
+        data = self.form_data(restaurant={"slug": restaurant.slug, "name": restaurant.name,
+                                          "email": restaurant.email, "admin_password": "", **changes})
         return self.client.post(f"/admin/core/restaurant/{restaurant.pk}/change/", data)
 
     def test_the_password_box_resets_the_admin_password(self):
-        self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        self.client.post("/admin/core/restaurant/add/", self.form_data())
         restaurant = Restaurant.objects.get(slug="spice-garden")
         self.assertEqual(self.edit(restaurant).status_code, 302)  # empty: kept
         self.assertTrue(self.staff_of("ADMIN").user.check_password("Spice@2026"))
@@ -421,7 +430,7 @@ class AdminRestaurantFormTests(TestCase):
         self.assertTrue(self.staff_of("ADMIN").user.check_password("Fresh@2027"))
 
     def test_a_new_email_moves_the_login_only_when_changed_here(self):
-        self.client.post("/admin/core/restaurant/add/", self.form_data(rows=0))
+        self.client.post("/admin/core/restaurant/add/", self.form_data())
         restaurant = Restaurant.objects.get(slug="spice-garden")
         self.assertEqual(self.edit(restaurant, email="boss@spice.in").status_code, 302)
         self.assertEqual(self.staff_of("ADMIN").user.username, "boss@spice.in")
@@ -438,6 +447,50 @@ class AdminRestaurantFormTests(TestCase):
         self.assertIsNone(old.admin_login())
         self.assertEqual(self.edit(old, admin_password="Old@20260").status_code, 302)
         self.assertEqual(old.admin_login().user.email, "old@cafe.in")
+
+
+class ProfileFirstTests(TestCase):
+    """A new cafe's admin: the cafe profile first (address, phone), then the staff logins."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant("Green Leaf", address="", phone="")
+        self.admin = make_staff(self.restaurant, "ADMIN")
+        self.client = client_for(self.admin)
+
+    def profile(self, **changes):
+        return {"name": "Green Leaf", "address": "4 MG Road, Pune", "phone": "9876543210", "email": "",
+                "gstin": "", "gst_percent": "5", "fssai_no": "", **changes}
+
+    def test_first_login_opens_the_profile_with_the_steps(self):
+        self.assertRedirects(self.client.get("/home/"), "/restaurant/", fetch_redirect_response=False)
+        page = self.client.get("/restaurant/")
+        self.assertContains(page, "Step 1 of 2: your cafe profile")
+        self.assertContains(page, "address and phone number")
+
+    def test_staff_waits_for_the_profile(self):
+        self.assertContains(self.client.get("/staff/"), "First your cafe profile, then your staff")
+        self.assertNotContains(self.client.get("/staff/"), 'hx-get="/staff/add/"')
+        new = {"name": "Kavya", "email": "kavya@x.test", "role": "WAITER", "password": "Waiter@2026", "is_active": "on"}
+        self.assertContains(self.client.post("/staff/add/", new, **HTMX), "Step 1 of 2")
+        self.assertFalse(self.restaurant.staff_members.filter(name="Kavya").exists())
+
+    def test_the_profile_needs_address_and_phone(self):
+        self.assertContains(self.client.post("/restaurant/", self.profile(address="")), "This field is required")
+
+    def test_saving_the_profile_goes_on_to_staff_then_staff_can_be_added(self):
+        self.assertRedirects(self.client.post("/restaurant/", self.profile()), "/staff/", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/home/"), "/dashboard/", fetch_redirect_response=False)
+        self.assertContains(self.client.get("/staff/"), 'hx-get="/staff/add/"')
+        new = {"name": "Kavya", "email": "kavya@x.test", "role": "WAITER", "password": "Waiter@2026", "is_active": "on"}
+        self.assertEqual(self.client.post("/staff/add/", new, **HTMX).status_code, 204)
+        login = Client().post("/login/", {"username": "kavya@x.test", "password": "Waiter@2026"})
+        self.assertEqual(login.status_code, 302)  # the waiter signs in (no tick)
+        # later saves stay on the profile
+        self.assertRedirects(self.client.post("/restaurant/", self.profile()), "/restaurant/", fetch_redirect_response=False)
+
+    def test_other_roles_go_to_their_own_screen(self):
+        waiter = client_for(make_staff(self.restaurant, "WAITER"))
+        self.assertNotEqual(waiter.get("/home/")["Location"], "/restaurant/")
 
 
 class RoleAndLimitTests(TestCase):
@@ -584,8 +637,10 @@ class DashboardTests(TestCase):
         KOT.objects.filter(pk=kot.pk).update(status="READY", ready_at=kot.created_at + timedelta(minutes=12))
         kitchen = kitchen_figures(place, today, today)
         self.assertEqual((kitchen["kots"], kitchen["avg_prep"], kitchen["on_time"]), (1, 12, 100))
-        order = Order.objects.get()
-        Order.objects.filter(pk=order.pk).update(status="CLOSED", closed_at=order.created_at + timedelta(minutes=50))
+        # at noon, so the 50 minutes stay inside today whatever the clock says when the test runs
+        noon = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time().replace(hour=12)))
+        Order.objects.filter(pk=Order.objects.get().pk).update(status="CLOSED", created_at=noon,
+                                                               closed_at=noon + timedelta(minutes=50))
         tables = table_figures(place, today, today, 1)
         self.assertEqual((tables["orders"], tables["avg_stay"], tables["turns"]), (1, 50, 1.0))
         heat = heatmap(Bill.objects.all())
@@ -901,7 +956,7 @@ class BillSettingsTests(TestCase):
         self.assertIn(b"Taxes", slip)
 
     def test_logo_and_upi_print_while_the_bill_is_unpaid(self):
-        self.admin.post("/restaurant/", {"name": "Spice Garden", "address": "", "phone": "", "email": "",
+        self.admin.post("/restaurant/", {"name": "Spice Garden", "address": "12 Test Road", "phone": "9876500000", "email": "",
                                          "gstin": "", "gst_percent": "5", "fssai_no": "", "logo": self.picture("logo.png")})
         self.assertContains(self.save(upi_id="bad id"), "name@bank")
         self.save(upi_id="SpiceGarden@okicici", upi_qr=self.picture("upi.png"))

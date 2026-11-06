@@ -1,0 +1,313 @@
+{% load static money %}<!DOCTYPE html>
+{% comment %}
+A cafe's own one-page website, /cafe/<slug>/ (web.views.cafe_site): the same look as our
+website (web/home.html), with the cafe's name, story, menu, locations and contacts.
+The words come from Cafe profile > Website; a section with nothing to show is left out.
+{% endcomment %}
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ restaurant.name }}{% if website.tagline %} · {{ website.tagline }}{% endif %}</title>
+    <meta name="description" content="{% firstof website.tagline about|truncatechars:155 %}">
+    {# shared on WhatsApp, Instagram or Facebook: the name, the line and the cover #}
+    <meta property="og:title" content="{{ restaurant.name }}">
+    <meta property="og:description" content="{% firstof website.tagline about|truncatechars:155 %}">
+    {% if cover %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ cover.url }}">{% endif %}
+    {# the cafe's own logo in the browser tab: this is the cafe's page, not ours #}
+    {% if logo %}<link rel="icon" href="{{ logo.url }}">{% endif %}
+
+    <meta name="theme-color" content="#da3831">
+    <meta name="color-scheme" content="light">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{% static 'css/app.css' %}" rel="stylesheet">
+</head>
+
+<body class="site cafe-site" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% url 'orders:public_menu' restaurant.slug as order_url %}
+{% url 'orders:menu_view' restaurant.slug as menu_url %}
+
+{# ================================================================ top bar #}
+<header class="site-nav navbar navbar-expand-lg sticky-top">
+    <div class="site-container">
+        <a class="site-brand" href="#top">
+            {% if logo %}<img class="cafe-logo" src="{{ logo.url }}" alt="">
+            {% else %}<span class="brand-mark" aria-hidden="true">{{ restaurant.name|slice:":1"|upper }}</span>{% endif %}
+            <span class="truncate">{{ restaurant.name }}</span>
+        </a>
+
+        <button class="site-toggler navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteMenu"
+                aria-controls="siteMenu" aria-expanded="false" aria-label="Open menu">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <nav class="collapse navbar-collapse" id="siteMenu" aria-label="{{ restaurant.name }}">
+            <ul class="navbar-nav site-links">
+                <li><a class="site-link" href="#top">Home</a></li>
+                <li><a class="site-link" href="#about">About</a></li>
+                {% if categories %}<li><a class="site-link" href="#menu">Menu</a></li>{% endif %}
+                <li><a class="site-link" href="#visit">Visit us</a></li>
+                {% if reviews %}<li><a class="site-link" href="#reviews">Reviews</a></li>{% endif %}
+                <li><a class="site-link" href="#contact">Contact</a></li>
+            </ul>
+            <div class="site-nav-actions">
+                {% if can_book %}<a class="btn btn-light" href="{% url 'orders:public_booking' restaurant.slug %}"><i class="bi bi-calendar-check" aria-hidden="true"></i> Book a table</a>{% endif %}
+                {% if orders_online %}
+                <a class="btn btn-primary" href="{{ order_url }}"><i class="bi bi-bag" aria-hidden="true"></i> Order online</a>
+                {% else %}
+                <a class="btn btn-primary" href="{{ menu_url }}"><i class="bi bi-journal-text" aria-hidden="true"></i> See the menu</a>
+                {% endif %}
+            </div>
+        </nav>
+    </div>
+</header>
+
+<main id="top">
+
+    {# ============================================================== hero #}
+    <section class="site-hero">
+        <div class="site-container hero-grid">
+            <div class="hero-copy">
+                <span class="eyebrow"><i class="bi bi-stars" aria-hidden="true"></i> {% if highlights %}{{ highlights.0.0 }}{% else %}Welcome{% endif %}</span>
+                <h1>{{ restaurant.name }}</h1>
+                {# the line under the name; the story itself is in About, so only without a line #}
+                {% if website.tagline %}<p class="hero-lead cafe-tagline">{{ website.tagline }}</p>
+                {% elif website.about %}<p class="hero-lead">{{ website.about|truncatewords:30 }}</p>{% endif %}
+                <div class="hero-ctas">
+                    {% if orders_online %}
+                    <a class="btn btn-primary btn-lg" href="{{ order_url }}">Order online <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    <a class="btn btn-light btn-lg" href="{{ menu_url }}"><i class="bi bi-journal-text" aria-hidden="true"></i> See the menu</a>
+                    {% else %}
+                    <a class="btn btn-primary btn-lg" href="{{ menu_url }}">See the menu <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    {% endif %}
+                    {% if can_book %}<a class="btn btn-light btn-lg" href="{% url 'orders:public_booking' restaurant.slug %}"><i class="bi bi-calendar-check" aria-hidden="true"></i> Book a table</a>{% endif %}
+                </div>
+                <ul class="hero-points">
+                    {% if hours %}<li><i class="bi bi-clock-fill" aria-hidden="true"></i> {{ hours.0 }}</li>{% endif %}
+                    {% if restaurant.phone %}<li><i class="bi bi-telephone-fill" aria-hidden="true"></i> <a href="tel:{{ restaurant.phone|cut:' ' }}">{{ restaurant.phone }}</a></li>{% endif %}
+                    {% if restaurant.delivery_enabled and orders_online %}<li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Home delivery</li>{% endif %}
+                </ul>
+            </div>
+
+            {# the cover photo (or the logo), with two small cards like our own website's #}
+            <div class="hero-visual cafe-visual">
+                <div class="hero-glow" aria-hidden="true"></div>
+                {% if cover %}
+                <img class="cafe-cover" src="{{ cover.url }}" alt="{{ restaurant.name }}">
+                {% else %}
+                <div class="cafe-cover cafe-cover--blank" aria-hidden="true">
+                    {% if logo %}<img src="{{ logo.url }}" alt="">{% else %}<span>{{ restaurant.name|slice:":1"|upper }}</span>{% endif %}
+                </div>
+                {% endif %}
+                {% if hours %}
+                <div class="float-card float-card--kot">
+                    <span class="float-icon"><i class="bi bi-clock" aria-hidden="true"></i></span>
+                    <div><strong>Open</strong><small>{{ hours.0 }}</small></div>
+                </div>
+                {% endif %}
+                {% if dish_count %}
+                <div class="float-card float-card--paid">
+                    <span class="float-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+                    <div><strong>{{ dish_count }} dish{{ dish_count|pluralize:"es" }} on the menu</strong><small>{% if orders_online %}Order online for takeaway{% if restaurant.delivery_enabled %} or delivery{% endif %}{% else %}See them all online{% endif %}</small></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    {# ========================================================= highlights #}
+    {% if highlights %}
+    <section class="site-strip" aria-label="Highlights">
+        <div class="site-container strip-row">
+            {% for label, icon in highlights %}<span><i class="bi bi-{{ icon }}" aria-hidden="true"></i> {{ label }}</span>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {# ============================================================== about #}
+    <section id="about" class="site-section">
+        <div class="site-container cafe-about{% if not photos %} cafe-about--text{% endif %}">
+            <div>
+                <span class="eyebrow">Our story</span>
+                <h2 class="cafe-h2">About {{ restaurant.name }}</h2>
+                <div class="cafe-story">{{ about|linebreaks }}</div>
+            </div>
+            {% if photos %}
+            <div class="cafe-gallery cafe-gallery--{{ photos|length }}">
+                {% for photo in photos %}
+                <figure>
+                    <img src="{{ photo.image.url }}" alt="{% firstof photo.text restaurant.name %}" loading="lazy">
+                    {% if photo.text %}<figcaption>{{ photo.text }}</figcaption>{% endif %}
+                </figure>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {# =============================================================== menu #}
+    {% if categories %}
+    <section id="menu" class="site-section site-section--tint">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">Our menu</span>
+                <h2>What we cook</h2>
+                <p>{{ dish_count }} dish{{ dish_count|pluralize:"es" }} in {{ categories|length }} section{{ categories|length|pluralize }}. Prices include the dish; GST is added on the bill.</p>
+            </div>
+
+            {% if picks %}
+            <div class="cafe-picks">
+                {% for item in picks %}
+                <article class="cafe-pick">
+                    <img src="{{ item.image.url }}" alt="{{ item.name }}" loading="lazy">
+                    <div>
+                        <h3><span class="food-dot food-{{ item.food_type|lower }}" aria-hidden="true"></span> {{ item.name }}</h3>
+                        <strong>{% if item.sizes %}<small>from</small> {% endif %}{{ item.price|inr_short }}</strong>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="cafe-menu">
+                {% for category in categories %}
+                <article class="cafe-menu-card">
+                    <h3>{{ category.name }} <small>{{ category.menu_items|length }}</small></h3>
+                    <ul>
+                        {% for item in category.menu_items|slice:":6" %}
+                        <li{% if not item.is_available %} class="is-out"{% endif %}>
+                            <span class="cafe-dish"><span class="food-dot food-{{ item.food_type|lower }}" aria-label="{{ item.get_food_type_display }}"></span> {{ item.name }}</span>
+                            {% if item.sizes %}
+                            <span class="cafe-sizes">{% for p in item.sizes %}<span>{{ p.name }} <b>{{ p.price|inr_short }}</b></span>{% endfor %}</span>
+                            {% else %}
+                            <b>{{ item.price|inr_short }}</b>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% if category.menu_items|length > 6 %}
+                    <a class="cafe-more" href="{{ menu_url }}">and {{ category.menu_items|length|add:"-6" }} more <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            <div class="cafe-center">
+                <a class="btn btn-light btn-lg" href="{{ menu_url }}"><i class="bi bi-journal-text" aria-hidden="true"></i> The full menu</a>
+                {% if orders_online %}<a class="btn btn-primary btn-lg" href="{{ order_url }}">Order online <i class="bi bi-arrow-right" aria-hidden="true"></i></a>{% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ======================================================== locations #}
+    <section id="visit" class="site-section">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">Visit us</span>
+                <h2>{% if locations|length > 1 %}Our {{ locations|length }} places{% else %}Where to find us{% endif %}</h2>
+            </div>
+            <div class="cafe-places">
+                {% for place in locations %}
+                {% firstof place.address restaurant.address as address %}
+                <article class="cafe-place">
+                    <span class="feature-icon"><i class="bi bi-geo-alt" aria-hidden="true"></i></span>
+                    <h3>{% if locations|length > 1 %}{{ place.name }}{% else %}{{ restaurant.name }}{% endif %}</h3>
+                    {% if address %}<p>{{ address|linebreaksbr }}</p>{% endif %}
+                    {% firstof place.phone restaurant.phone as phone %}
+                    {% if phone %}<p><i class="bi bi-telephone" aria-hidden="true"></i> <a href="tel:{{ phone|cut:' ' }}">{{ phone }}</a></p>{% endif %}
+                    {% if hours %}<ul class="cafe-hours">{% for line in hours %}<li><i class="bi bi-clock" aria-hidden="true"></i> {{ line }}</li>{% endfor %}</ul>{% endif %}
+                    <div class="cafe-place-actions">
+                        {% if address %}<a class="btn btn-light btn-sm" href="https://www.google.com/maps/search/?api=1&amp;query={{ restaurant.name|urlencode }}%2C%20{{ address|urlencode }}" target="_blank" rel="noopener"><i class="bi bi-sign-turn-right" aria-hidden="true"></i> Get directions</a>{% endif %}
+                        {% if orders_online %}<a class="btn btn-primary btn-sm" href="{{ order_url }}{% if locations|length > 1 %}?at={{ place.pk }}{% endif %}"><i class="bi bi-bag" aria-hidden="true"></i> Order from here</a>{% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {# ============================================================ reviews #}
+    {% if reviews %}
+    <section id="reviews" class="site-section site-section--tint">
+        <div class="site-container">
+            <div class="section-head">
+                <span class="eyebrow">Reviews</span>
+                <h2>What our guests say</h2>
+            </div>
+            <div class="feature-grid">
+                {% for review in reviews %}
+                <figure class="feature-card cafe-review">
+                    <span class="cafe-stars" aria-label="{{ review.rating }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= review.rating %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span>
+                    <blockquote>{{ review.message|truncatewords:60 }}</blockquote>
+                    <figcaption>{{ review.name }} · {{ review.created_at|date:"M Y" }}</figcaption>
+                </figure>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# =================================================== contact + feedback #}
+    <section id="contact" class="site-section site-cta">
+        <div class="site-container cta-grid">
+            <div class="cta-copy">
+                <span class="eyebrow eyebrow--light">Say hello</span>
+                <h2>We would love to hear from you</h2>
+                <p>Call us for a table or a party order, or tell us how your visit was. Every message reaches us.</p>
+                <ul class="cta-contact">
+                    {% if restaurant.phone %}<li><i class="bi bi-telephone" aria-hidden="true"></i> <a href="tel:{{ restaurant.phone|cut:' ' }}">{{ restaurant.phone }}</a></li>{% endif %}
+                    {% if website.whatsapp %}<li><i class="bi bi-whatsapp" aria-hidden="true"></i> <a href="https://wa.me/91{{ website.whatsapp }}" target="_blank" rel="noopener">WhatsApp us</a></li>{% endif %}
+                    {% if restaurant.email %}<li><i class="bi bi-envelope" aria-hidden="true"></i> <a href="mailto:{{ restaurant.email }}">{{ restaurant.email }}</a></li>{% endif %}
+                    {% if website.instagram %}<li><i class="bi bi-instagram" aria-hidden="true"></i> <a href="{{ website.instagram }}" target="_blank" rel="noopener">Instagram</a></li>{% endif %}
+                    {% if website.facebook %}<li><i class="bi bi-facebook" aria-hidden="true"></i> <a href="{{ website.facebook }}" target="_blank" rel="noopener">Facebook</a></li>{% endif %}
+                    {% if restaurant.address %}<li><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ restaurant.address|linebreaksbr }}</li>{% endif %}
+                </ul>
+            </div>
+
+            <div class="cta-card" id="feedbackBox">
+                {% include "web/_feedback_form.html" %}
+            </div>
+        </div>
+    </section>
+</main>
+
+{# ============================================================== footer #}
+<footer class="site-footer">
+    <div class="site-container footer-row">
+        <a class="site-brand" href="#top">
+            {% if logo %}<img class="cafe-logo" src="{{ logo.url }}" alt="">
+            {% else %}<span class="brand-mark" aria-hidden="true">{{ restaurant.name|slice:":1"|upper }}</span>{% endif %}
+            {{ restaurant.name }}
+        </a>
+        <nav class="footer-links" aria-label="Footer">
+            <a href="#top">Home</a>
+            <a href="#about">About</a>
+            <a href="{{ menu_url }}">Menu</a>
+            {% if orders_online %}<a href="{{ order_url }}">Order online</a>{% endif %}
+            {% if can_book %}<a href="{% url 'orders:public_booking' restaurant.slug %}">Book a table</a>{% endif %}
+            <a href="#contact">Feedback</a>
+        </nav>
+        <small>&copy; {% now "Y" %} {{ restaurant.name }} · Website by <a href="{% url 'web:home' %}">{{ brand_name }}</a></small>
+    </div>
+</footer>
+
+<div class="toast-area" id="toastArea" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+<script src="{% static 'js/app.js' %}"></script>
+<script>
+    // phone: close the menu after tapping a link in it
+    document.querySelectorAll("#siteMenu a[href^='#']").forEach(function (link) {
+        link.addEventListener("click", function () {
+            var menu = document.getElementById("siteMenu");
+            if (menu.classList.contains("show")) bootstrap.Collapse.getOrCreateInstance(menu).hide();
+        });
+    });
+</script>
+</body>
+</html>

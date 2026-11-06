@@ -44,14 +44,15 @@ class OrderTypeMixin:
     At a dining table: Dine in, or Take away (the guest's QR menu only; staff
     at a table take Dine in, takeaway is the floor's own "New takeaway").
     At the counter (the Takeaway table, also the public menu): Take away, or
-    Delivery when the restaurant takes deliveries. With one choice left it is
-    not shown at all.
+    Delivery when the restaurant takes deliveries; the guest on the public menu
+    may also eat in (dine_in_at_counter: Dine in first, then a table or none).
+    With one choice left it is not shown at all.
     Delivery needs a name, a mobile number and an address (a rider goes there).
     """
 
-    def set_order_types(self, counter, delivery, takeaway_at_table=True):
+    def set_order_types(self, counter, delivery, takeaway_at_table=True, dine_in_at_counter=False):
         if counter:
-            choices = [(TAKEAWAY, "Take away")]
+            choices = ([(DINE_IN, "Dine in")] if dine_in_at_counter else []) + [(TAKEAWAY, "Take away")]
         else:
             choices = [(DINE_IN, "Dine in")] + ([(TAKEAWAY, "Take away")] if takeaway_at_table else [])
         if counter and delivery:
@@ -61,7 +62,8 @@ class OrderTypeMixin:
         field.initial = choices[0][0]
         if len(choices) == 1:
             field.widget = forms.HiddenInput()
-        self.default_type = choices[0][0]
+        # sent without a type (a page from before Dine in was there): the counter takes a parcel
+        self.default_type = TAKEAWAY if counter else choices[0][0]
 
     def clean_order_type(self):
         return self.cleaned_data["order_type"] or self.default_type
@@ -98,10 +100,16 @@ class CustomerOrderForm(OrderTypeMixin, forms.Form):
     name the order shows "Guest at <table>" / "Takeaway guest".
     Delivery (public menu only): name, mobile and address are needed, and
     the restaurant calls to confirm before cooking.
+    Dine in from the public menu (tables given): pick your table, or none for
+    the Common table (tables.models.common_table).
     """
 
     order_type = order_type_field()
     bill = bill_field()
+    table = forms.ModelChoiceField(
+        label="Your table", queryset=None, required=False, empty_label="No table · the common table",
+        help_text="Sitting at a table? Pick it, so we serve you there. Not sure: leave it, we will find you.",
+    )
     customer_name = forms.CharField(label="Your name", max_length=60, required=False)
     customer_phone = forms.CharField(
         label="Mobile number", max_length=15, required=False,
@@ -114,9 +122,13 @@ class CustomerOrderForm(OrderTypeMixin, forms.Form):
         widget=forms.Textarea(attrs={"rows": 2, "placeholder": "e.g. less spicy, no onion"}),
     )
 
-    def __init__(self, *args, counter=False, delivery=False, **kwargs):
+    def __init__(self, *args, counter=False, delivery=False, tables=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.set_order_types(counter, delivery)
+        self.set_order_types(counter, delivery, dine_in_at_counter=tables is not None)
+        if tables is None:
+            del self.fields["table"]  # at a dining table the table is known; staff screens have no pick
+        else:
+            self.fields["table"].queryset = tables
         self.fields["customer_name"].widget.attrs.update({"autocomplete": "name", "placeholder": "Your name"})
         add_bootstrap_classes(self)
 

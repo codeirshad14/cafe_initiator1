@@ -50,30 +50,41 @@ def running_orders(table):
     ).order_by("created_at")
 
 
-def order_to_join(table, choice="", my_order=None):
+def joinable_orders(table, my_order=None, guest=False):
+    """The open orders a round at this table may go on. The Common table seats strangers:
+    a guest sees (and adds to) only their own order there; staff see them all."""
+    open_orders = running_orders(table).filter(status=Order.Status.OPEN)
+    if table.is_common and guest:
+        return open_orders.filter(pk=my_order.pk) if my_order else open_orders.none()
+    return open_orders
+
+
+def order_to_join(table, choice="", my_order=None, guest=False):
     """The OPEN order a new dine-in round is added to, or None to start a new order (its own bill).
 
     choice  "new"      -> None: a new order, a separate bill
             "12"       -> the open order with id 12 on this table (None if it was billed meanwhile)
             ""         -> this phone's own order if it is still open, else the table's oldest
-                          open order (friends at one table share a bill), else None
+                          open order (friends at one table share a bill), else None.
+                          At the Common table never someone else's: a new order then.
+    guest   True for the guest's own screens (the Common table: only their own order)
     """
     if table.is_takeaway or choice == "new":
         return None
-    open_orders = running_orders(table).filter(status=Order.Status.OPEN)
+    open_orders = joinable_orders(table, my_order, guest)
     if choice:
         return open_orders.filter(pk=choice).first() if str(choice).isdigit() else None
     if my_order is not None and open_orders.filter(pk=my_order.pk).exists():
         return my_order
-    return open_orders.first()
+    return None if table.is_common else open_orders.first()
 
 
-def bill_choice(table, my_order=None):
+def bill_choice(table, my_order=None, guest=False):
     """What the "Which bill?" choice needs (orders/_bill_choice.html, cart and waiter
     screens): the table's open orders and the one picked when nobody chooses."""
     return {
-        "open_orders": list(running_orders(table).filter(status=Order.Status.OPEN)),
-        "default_order": order_to_join(table, "", my_order),
+        "open_orders": list(joinable_orders(table, my_order, guest)),
+        "default_order": order_to_join(table, "", my_order, guest),
         "my_order": my_order,
     }
 

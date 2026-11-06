@@ -16,6 +16,9 @@ class DiningTable(models.Model):
     Each location also has one default "Takeaway" table (is_takeaway=True),
     made automatically by takeaway_table(). Take-away and delivery orders go
     on it, and it can hold many open orders at once (a dining table holds one).
+    And one "Common table" (is_common=True, common_table()): a guest who orders
+    Dine in from the public menu without picking a table sits there. It is a
+    dining table that is never full: every guest's order on it is their own.
     Orders take their location from their table.
     """
 
@@ -27,6 +30,7 @@ class DiningTable(models.Model):
     qr_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     is_active = models.BooleanField(default=True)
     is_takeaway = models.BooleanField(default=False, editable=False)
+    is_common = models.BooleanField(default=False, editable=False)
 
     class Meta:
         ordering = ["section", "name"]
@@ -186,3 +190,26 @@ def takeaway_table(restaurant, location=None):
             restaurant=restaurant, location=location, name=name, section="Counter", capacity=1, is_takeaway=True,
         )
     return table
+
+
+COMMON_NAME = "Common table"
+
+
+def common_table(restaurant, location=None):
+    """The location's Common table: Dine in from the public menu without a table picked.
+    Made the first time it is needed; never checked for free seats (each order is its own)."""
+    location = location or restaurant.main_location()
+    table = DiningTable.objects.filter(location=location, is_common=True).first()
+    if table is None:
+        name = COMMON_NAME
+        if DiningTable.objects.filter(location=location, name__iexact=name).exists():
+            name = "Common"
+        table = DiningTable.objects.create(
+            restaurant=restaurant, location=location, name=name, section="Common", capacity=1, is_common=True,
+        )
+    return table
+
+
+def tables_to_pick(location):
+    """The tables a guest may pick on the public menu (Dine in): this location's open dining tables."""
+    return DiningTable.objects.filter(location=location, is_active=True, is_takeaway=False, is_common=False)

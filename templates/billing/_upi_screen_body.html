@@ -1,0 +1,24 @@
+{% load money %}
+{# the customer screen's middle: asks again every 3 seconds until the bill is paid (then it stops) #}
+<section class="upi-screen-body" id="upiScreenBody"
+         {% if not paid %}hx-get="{% url 'billing:bill_upi_screen' bill.pk %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+    {% if paid %}
+    <span class="upi-screen-done"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+    <h1>Payment received</h1>
+    <p>Thank you for dining with us!</p>
+    {% elif can_make_qr %}
+    <p class="upi-screen-label">Bill #{{ bill.bill_no }} · scan and pay</p>
+    <p class="upi-screen-amount">{{ amount|inr }}</p>
+    <img class="upi-screen-qr" src="{% url 'billing:bill_upi_qr' bill.pk %}?v={{ amount }}" alt="UPI QR code for {{ amount|inr }}">
+    <p class="upi-screen-apps"><i class="bi bi-phone" aria-hidden="true"></i> GPay · PhonePe · Paytm · BHIM · any UPI app</p>
+    <p class="upi-screen-to">{{ restaurant.bill_name }} · {{ restaurant.upi_id }}</p>
+    {% elif own_qr %}
+    <p class="upi-screen-label">Bill #{{ bill.bill_no }} · scan and pay</p>
+    <p class="upi-screen-amount">{{ amount|inr }}</p>
+    <img class="upi-screen-qr" src="{{ own_qr.url }}" alt="UPI QR code of {{ restaurant.name }}">
+    <p class="upi-screen-apps">Please type {{ amount|inr }} in your UPI app</p>
+    {% else %}
+    <h1>Please pay at the counter</h1>
+    <p>{{ amount|inr }}</p>
+    {% endif %}
+</section>

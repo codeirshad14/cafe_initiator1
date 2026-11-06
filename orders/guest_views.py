@@ -29,11 +29,11 @@ from core.locations import location_from_link
 from core.models import Restaurant
 from core.utils import is_htmx
 from menu.models import MenuItem, MenuItemPortion
-from tables.models import takeaway_table
+from tables.models import common_table, tables_to_pick, takeaway_table
 
 from .cart import (
     MAX_QTY, add_qty, cart_details, change_qty, clear_cart, dish_and_portion, item_cart_total, keep_orderable_only,
-    line_key, menu_facts, menu_with_cart, read_cart, remove_line,
+    menu_facts, menu_with_cart, read_cart, remove_line, with_counts,
 )
 from .decorators import with_customer_table
 from .forms import CustomerOrderForm, TrackLookupForm
@@ -72,7 +72,7 @@ def render_cart_page(request, table, form, cart, error=""):
         "form": form,
         "error": error,
         "max_qty": MAX_QTY,
-        **bill_choice(table, my_running_order(request, table)),
+        **bill_choice(table, my_running_order(request, table), guest=True),
     })
 
 
@@ -186,12 +186,25 @@ def customer_menu(request, table):
     return render_menu(request, table)
 
 
+def order_type_key(table):
+    return f"order_type_{table.qr_token}"
+
+
+def public_order_types(table):
+    """The public menu's three ways: [(code, label, icon)]; Delivery only when the restaurant delivers."""
+    types = [(Order.OrderType.DINE_IN, "Dine in", "cup-hot"), (Order.OrderType.TAKEAWAY, "Take away", "bag")]
+    if table.restaurant.delivery_enabled:
+        types.append((Order.OrderType.DELIVERY, "Delivery", "bicycle"))
+    return types
+
+
 def render_menu(request, table):
     """The one guest menu page (orders/menu.html) for a table, or for the counter
-    (the public menu: take away / delivery). Same look everywhere; only the
-    words for "where you are" change (at_table)."""
+    (the public menu: dine in / take away / delivery). Same look everywhere; only the
+    words for "where you are" change (at_table). On the public menu the guest
+    picks how they want it (?type=); the cart starts with that choice."""
     categories = menu_with_cart(table.restaurant, read_cart(request, table))
-    return render(request, "orders/menu.html", {
+    context = {
         "table": table,
         "at_table": not table.is_takeaway,
         "restaurant": table.restaurant,
@@ -201,7 +214,19 @@ def render_menu(request, table):
         **menu_facts(categories),
         "cart": cart_details(request, table),
         "my_order": my_running_order(request, table),
-    })
+    }
+    if table.is_takeaway:
+        types = public_order_types(table)
+        wanted = request.GET.get("type", "")
+        if wanted in [code for code, _, _ in types]:
+            request.session[order_type_key(table)] = wanted
+        at = request.GET.get("at", "")
+        context.update({
+            "order_types": types,
+            "order_type": request.session.get(order_type_key(table), types[0][0]),
+            "location_query": f"at={at}" if at.isdigit() else "",
+        })
+    return render(request, "orders/menu.html", context)
 
 
 @with_customer_table
@@ -233,10 +258,7 @@ def cart_put(request, table, item_id):
     if not warning:
         added, warning = add_qty(request, table, item, max(1, min(qty, MAX_QTY)), portion)
 
-    cart = read_cart(request, table)
-    item.cart_qty = cart.get(line_key(item), 0)
-    item.cart_total = item_cart_total(cart, item, list(item.portions.all()))
-    item.sizes = list(item.portions.all())
+    with_counts(item, read_cart(request, table))
     response = render(request, "orders/_dish_added.html", {
         "table": table, "item": item, "cart": cart_details(request, table),
     })
@@ -274,10 +296,7 @@ def change_cart(request, table, item_id, step):
             "table": table, "cart": details, "max_qty": MAX_QTY, "refresh_total": True,
         })
     else:
-        cart = read_cart(request, table)
-        item.sizes = list(item.portions.all())
-        item.cart_qty = cart.get(line_key(item), 0)
-        item.cart_total = item_cart_total(cart, item, item.sizes)
+        with_counts(item, read_cart(request, table))
         response = render(request, "orders/_item_update.html", {"table": table, "item": item, "cart": details})
 
     if warning:
@@ -311,20 +330,24 @@ def cart_view(request, table):
     if not cart["lines"] and not error:
         return redirect(table.menu_path)
 
-    form = customer_form(table, initial={
+    initial = {
         "customer_name": request.session.get("customer_name", ""),
         "customer_phone": request.session.get("customer_phone", ""),
         "customer_address": request.session.get("customer_address", ""),
-    })
+    }
+    if request.session.get(order_type_key(table)):  # picked on the public menu
+        initial["order_type"] = request.session[order_type_key(table)]
+    form = customer_form(table, initial=initial)
     return render_cart_page(request, table, form, cart, error)
 
 
 def customer_form(table, *args, **kwargs):
     """The cart's details form. At a dining table: Dine in / Take away. At the
-    counter (the public menu, the Takeaway QR): Take away, or Delivery when the
-    restaurant takes deliveries."""
+    counter (the public menu, the Takeaway QR): Dine in (a table of this location,
+    or none: the Common table), Take away, or Delivery when the restaurant takes deliveries."""
     counter = table.is_takeaway
-    return CustomerOrderForm(*args, counter=counter, delivery=counter and table.restaurant.delivery_enabled, **kwargs)
+    return CustomerOrderForm(*args, counter=counter, delivery=counter and table.restaurant.delivery_enabled,
+                             tables=tables_to_pick(table.location) if counter else None, **kwargs)
 
 
 @require_POST
@@ -336,6 +359,8 @@ def order_place(request, table):
     guest's own order ("My own bill"). Take away: a separate order on the
     restaurant's counter (Takeaway) table. Delivery (public menu): a separate
     order that waits for the restaurant to call and confirm it.
+    Dine in from the public menu: an order of its own on the table the guest
+    picked, or on the location's Common table when they picked none.
     """
     cart = cart_details(request, table)
     form = customer_form(table, request.POST)
@@ -356,12 +381,19 @@ def order_place(request, table):
 
     order_type = form.cleaned_data["order_type"]
     dine_in = order_type == Order.OrderType.DINE_IN
-    join = order_to_join(table, form.cleaned_data["bill"], my_running_order(request, table)) if dine_in else None
+    seat = table  # where the order goes
+    if dine_in and table.is_takeaway:  # the public menu: the table picked, else the Common table
+        seat = form.cleaned_data.get("table") or common_table(table.restaurant, table.location)
+        join = None  # an order of its own: never someone else's bill from a public link
+    elif dine_in:
+        join = order_to_join(table, form.cleaned_data["bill"], my_running_order(request, table), guest=True)
+    else:
+        join = None
     # the name is optional (not for delivery): keep the order's name, else "Guest at T5" / "Takeaway guest"
-    default_name = join.customer_name if join else (f"Guest at {table.name}" if dine_in else "Takeaway guest")
+    default_name = join.customer_name if join else (f"Guest at {seat.name}" if dine_in else "Takeaway guest")
     try:
         kot = place_kot(
-            table, cart["lines"],
+            seat, cart["lines"],
             customer_name=form.cleaned_data["customer_name"] or default_name,
             customer_phone=form.cleaned_data["customer_phone"],
             customer_address=form.cleaned_data["customer_address"],
@@ -379,6 +411,8 @@ def order_place(request, table):
     request.session["customer_phone"] = form.cleaned_data["customer_phone"]
     request.session["customer_address"] = form.cleaned_data["customer_address"]
     request.session[last_order_key(table)] = str(kot.order.public_token)
+    if seat != table:  # "order more" opens that table's menu: there this order is this phone's own
+        request.session[last_order_key(seat)] = str(kot.order.public_token)
     return redirect(reverse("orders:order_track", args=[kot.order.public_token]) + "?placed=1")
 
 

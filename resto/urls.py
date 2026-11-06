@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
-from core.forms import StaffLoginForm
+from core.views import StaffLoginView
 
 admin.site.site_header = f"{settings.BRAND_NAME} admin (developer)"
 admin.site.site_title = f"{settings.BRAND_NAME} admin"
@@ -13,11 +13,7 @@ admin.site.index_title = "Restaurants, memberships and logins"
 urlpatterns = [
     path("admin/", admin.site.urls),
     # Django's own login / logout views (logout needs a POST)
-    path(
-        "login/",
-        auth_views.LoginView.as_view(authentication_form=StaffLoginForm, redirect_authenticated_user=True),
-        name="login",
-    ),
+    path("login/", StaffLoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("menu/", include("menu.urls")),
     path("tables/", include("tables.urls")),

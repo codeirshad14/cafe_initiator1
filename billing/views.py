@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +22,7 @@ from tables.models import takeaway_table
 from .forms import BillCancelForm, BillFilterForm, DiscountForm, PaymentForm
 from .models import Bill, Payment
 from .printing import bill_slip
+from .upi import bill_upi_png
 from .services import (
     BillingError, add_payments, cancel_bill, make_bill, offer_for, preview_totals, remove_payment, reopen_order,
 )
@@ -175,6 +176,76 @@ def payment_add(request, pk):
     if change:
         text += f" Return {inr(change)} change."
     return toast(response, text)
+
+
+# ================================================================ UPI QR with the amount
+
+def upi_context(bill):
+    """What the UPI QR screens need: the amount, and whether a QR with it can be made."""
+    restaurant = bill.restaurant
+    paid = bill.balance <= 0 or bill.status == Bill.Status.PAID
+    own_qr = restaurant.upi_qr if not restaurant.upi_id else None  # only the cafe's picture: no amount in it
+    return {
+        "bill": bill,
+        "restaurant": restaurant,
+        "amount": bill.balance,
+        "can_make_qr": bool(restaurant.upi_id),  # a UPI ID: a QR with the amount in it
+        "own_qr": own_qr,
+        "paid": paid,
+        "can_record": not paid and bool(restaurant.upi_id or own_qr),  # "Paid by UPI"
+    }
+
+
+@role_required(*BILLING_ROLES)
+def bill_upi(request, pk):
+    """Side panel (Take payment > Show UPI QR): a QR code with the balance in it, for the guest
+    to scan; "Customer screen" opens it big in a window for a second screen; then
+    "Paid by UPI" records the payment."""
+    bill = get_bill(request, pk)
+    if not is_htmx(request):
+        return redirect("billing:bill_detail", pk=bill.pk)
+    return render(request, "billing/_upi_panel.html", upi_context(bill))
+
+
+@role_required(*BILLING_ROLES)
+def bill_upi_qr(request, pk):
+    """The QR code picture of the bill's balance (PNG). Made fresh every time: never cached."""
+    bill = get_bill(request, pk)
+    if not bill.restaurant.upi_id or bill.balance <= 0:
+        raise Http404("No UPI ID, or nothing left to pay.")
+    response = HttpResponse(bill_upi_png(bill), content_type="image/png")
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@role_required(*BILLING_ROLES)
+def bill_upi_screen(request, pk):
+    """The customer screen: the QR code and the amount, big, for a second screen facing
+    the guest. It asks again every 3 seconds (HTMX); once the payment is recorded it
+    says "Payment received. Thank you!"."""
+    bill = get_bill(request, pk)
+    template = "billing/_upi_screen_body.html" if is_htmx(request) else "billing/upi_screen.html"
+    return render(request, template, upi_context(bill))
+
+
+@require_POST
+@role_required(*BILLING_ROLES)
+def bill_upi_paid(request, pk):
+    """HTMX, from the UPI panel: the guest has paid by UPI. Records the balance as one UPI
+    payment (with the UTR / reference if typed), closes the panel, redraws the payment box."""
+    bill = get_bill(request, pk)
+    reference = request.POST.get("reference_no", "").strip()[:50]
+    amount = bill.balance
+    try:
+        bill = add_payments(bill, [(Payment.Mode.UPI, amount, reference)], request.user.staff)
+    except BillingError as error:
+        return toast(render(request, "billing/_payment_box.html", payment_context(bill)), str(error), "error")
+    response = render(request, "billing/_payment_box.html", payment_context(bill))
+    text = f"{inr(amount)} UPI received."
+    if bill.status == Bill.Status.PAID:
+        text += f" Bill #{bill.bill_no} fully paid."
+    response["HX-Trigger"] = json.dumps({"closePanel": True, "showMessage": {"text": text, "level": "success"}})
+    return response
 
 
 @require_POST

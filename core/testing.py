@@ -14,9 +14,12 @@ HTMX = {"HTTP_HX_REQUEST": "true"}  # pass as **HTMX to make a request look like
 
 
 def make_restaurant(name="Spice Garden", **extra):
-    """A restaurant for a test: on the Ultimate plan (no limits) unless the test gives tier=."""
+    """A restaurant for a test: on the Ultimate plan (no limits) unless the test gives tier=,
+    with its profile filled in (address, phone) unless the test gives them empty."""
     slug = name.lower().replace(" ", "-")
     extra.setdefault("tier", "ULTIMATE")
+    extra.setdefault("address", "12 Test Road")
+    extra.setdefault("phone", "9876500000")
     return Restaurant.objects.create(name=name, slug=slug, **extra)
 
 

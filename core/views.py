@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.views import LoginView
 from django.urls import reverse
 from django.db import transaction
 from django.db.models import Q
@@ -14,11 +16,27 @@ from tables.models import DiningTable
 from . import roles
 from .analytics import by_location, dashboard_figures, period_filter_context
 from .decorators import role_required
-from .forms import BillSettingsForm, RestaurantForm, StaffForm
+from .forms import BillSettingsForm, RestaurantForm, StaffForm, StaffLoginForm
 from .models import Staff
 from .navigation import first_page_for
 from .pagination import paginate
 from .utils import get_user_location, get_user_restaurant, htmx_saved, is_htmx
+
+
+# ---------------------------------------------------------------- login
+
+class StaffLoginView(LoginView):
+    """/login/: Django's login with our form (email, "Sign in as restaurant admin").
+    On the server the login cookie only travels over https:// (SECURE_COOKIES), so the
+    page says so when it is opened over http://, instead of failing without a word."""
+
+    authentication_form = StaffLoginForm
+    redirect_authenticated_user = True
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cookies_need_https"] = settings.SESSION_COOKIE_SECURE
+        return context
 
 
 # ---------------------------------------------------------------- live screens
@@ -33,8 +51,11 @@ def live(request):
 
 @role_required()
 def home(request):
-    """After login: send each staff member to the first screen of their role."""
+    """After login: send each staff member to the first screen of their role.
+    A new cafe's admin (or manager) first fills in the cafe profile, then adds the staff."""
     staff = request.user.staff
+    if staff.role in roles.COMPANY and not staff.restaurant.profile_done:
+        return redirect("core:restaurant_settings")  # it says "Step 1 of 2" there
     url = first_page_for(staff.role, staff.restaurant.menu_only)
     if url:
         return redirect(url)
@@ -101,12 +122,18 @@ def restaurant_settings(request):
     """The restaurant admin edits their own restaurant: name, address, GST, logo.
 
     Membership is shown, not edited: the platform owner sets it in the Django admin.
+    A new cafe fills this in first; the first complete save goes on to Staff.
     """
     restaurant = get_user_restaurant(request)
+    first_time = not restaurant.profile_done
     if request.method == "POST":
         form = RestaurantForm(request.POST, request.FILES, instance=restaurant)
         if form.is_valid():
             form.save()
+            if first_time:
+                messages.success(request, "Your cafe profile is ready. Next: add your staff logins "
+                                          "(cashier, waiter, kitchen, rider…) with Add staff.")
+                return redirect("core:staff_list")
             messages.success(request, "Restaurant details saved.")
             return redirect("core:restaurant_settings")
     else:
@@ -115,6 +142,7 @@ def restaurant_settings(request):
     return render(request, "core/restaurant_settings.html", {
         "form": form,
         "restaurant": restaurant,
+        "first_time": first_time,
         "public_menu_url": request.build_absolute_uri(reverse("orders:public_menu", args=[restaurant.slug])),
     })
 
@@ -190,11 +218,14 @@ def staff_usage(request):
 
 @role_required(*roles.COMPANY)
 def staff_add(request):
-    """Side panel: create a login user and its Staff row in one form."""
+    """Side panel: create a login user and its Staff row in one form.
+    A new cafe fills in its profile first (Staff says so, and so does this panel)."""
     if not is_htmx(request):
         return redirect("core:staff_list")
 
     restaurant = get_user_restaurant(request)
+    if not restaurant.profile_done:
+        return render(request, "core/_profile_first.html", {"restaurant": restaurant})
 
     editor_role = request.user.staff.role
     if request.method == "POST":

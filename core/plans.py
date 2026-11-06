@@ -35,10 +35,12 @@ LIMITS = {
 }
 
 # The screens of an Only Menu cafe (view names; each covers the names that start with it):
-# the start page, the cafe profile and staff logins, the menu, and the menu's QR code.
+# the start page, the cafe profile and staff logins, the menu, the menu's QR code, and the
+# cafe's own website with its feedback.
 MENU_ONLY_VIEWS = (
     "core:home", "core:live", "core:switch_location", "core:restaurant_settings", "core:staff",
     "menu:", "tables:table_list", "tables:menu_qr", "tables:qr_sheet", "orders:notification",
+    "web:website_settings", "web:feedback",
 )
 
 NEAR_LIMIT = 0.9  # from 90% of the year's bills used, the Bills page warns

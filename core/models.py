@@ -286,6 +286,17 @@ class Restaurant(models.Model):
         """One more active login fits in the plan."""
         return self.active_users < self.max_users
 
+    # ---- the cafe's own profile (Create Update Profile): filled in by its admin after the first login
+    PROFILE_NEEDS = (("address", "address"), ("phone", "phone number"))  # printed on every bill and the public menu
+
+    def profile_missing(self):
+        """What the cafe has not filled in yet, e.g. ["address", "phone number"]; [] when the profile is done."""
+        return [label for field, label in self.PROFILE_NEEDS if not str(getattr(self, field) or "").strip()]
+
+    @property
+    def profile_done(self):
+        return not self.profile_missing()
+
     def admin_login(self):
         """The restaurant admin's login (Staff, role Admin; the first made), or None.
         A new restaurant gets it from its email in the Django admin (core/admin.py)."""

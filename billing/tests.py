@@ -144,6 +144,62 @@ class FestivalOfferTests(TestCase):
         self.assertNotContains(self.cashier.get(f"/billing/create/{self.order.pk}/"), "applied today")
 
 
+class UpiQrTests(TestCase):
+    """Take payment > Show UPI QR: a QR code with the balance in it (upi://pay), a customer
+    screen for a second monitor, and one tap to record the UPI payment."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant(upi_id="spicegarden@okicici")
+        _, paneer, naan = make_menu(self.restaurant)
+        guest_orders(Client(), make_table(self.restaurant), [paneer, paneer, naan])  # 558 -> bill 586
+        self.cashier = client_for(make_staff(self.restaurant, "CASHIER"))
+        self.cashier.post(f"/billing/create/{Order.objects.get().pk}/", {"discount_type": "AMOUNT"})
+        self.bill = Bill.objects.get()
+
+    def test_the_link_carries_the_upi_id_name_and_amount(self):
+        from billing.upi import upi_link
+        link = upi_link(self.restaurant, D("586"), "Bill 1 Spice Garden")
+        self.assertEqual(link, "upi://pay?pa=spicegarden@okicici&pn=Spice%20Garden&am=586.00&cu=INR&tn=Bill%201%20Spice%20Garden")
+
+    def test_show_the_qr_with_the_balance_then_record_it(self):
+        self.cashier.post(f"/billing/{self.bill.pk}/pay/", {"mode": "CASH", "amount": "86"}, **HTMX)
+        self.assertContains(self.cashier.get(f"/billing/{self.bill.pk}/"), "Show UPI QR for ₹500.00")
+        panel = self.cashier.get(f"/billing/{self.bill.pk}/upi/", **HTMX)
+        self.assertContains(panel, f"/billing/{self.bill.pk}/upi.png?v=500.00")
+        self.assertContains(panel, "spicegarden@okicici")
+        picture = self.cashier.get(f"/billing/{self.bill.pk}/upi.png")
+        self.assertEqual((picture["Content-Type"], picture.content[:4]), ("image/png", b"\x89PNG"))
+        screen = self.cashier.get(f"/billing/{self.bill.pk}/upi/screen/")
+        self.assertContains(screen, 'hx-trigger="every 3s"')  # asks again until paid
+        self.assertContains(screen, "₹500.00")
+
+        paid = self.cashier.post(f"/billing/{self.bill.pk}/upi/paid/", {"reference_no": "UTR4417"}, **HTMX)
+        self.assertIn("closePanel", paid["HX-Trigger"])
+        self.bill.refresh_from_db()
+        self.assertEqual(self.bill.status, "PAID")
+        upi = self.bill.payments.get(mode="UPI")
+        self.assertEqual((upi.amount, upi.reference_no), (D("500"), "UTR4417"))
+        done = self.cashier.get(f"/billing/{self.bill.pk}/upi/screen/", **HTMX)
+        self.assertContains(done, "Payment received")
+        self.assertNotContains(done, "every 3s")  # stops asking
+        self.assertEqual(self.cashier.get(f"/billing/{self.bill.pk}/upi.png").status_code, 404)  # nothing to pay
+
+    def test_without_a_upi_id(self):
+        self.restaurant.upi_id = ""
+        self.restaurant.save()
+        panel = self.cashier.get(f"/billing/{self.bill.pk}/upi/", **HTMX)
+        self.assertContains(panel, "No UPI ID yet")
+        self.assertNotContains(panel, "Paid by UPI")
+        self.assertEqual(self.cashier.get(f"/billing/{self.bill.pk}/upi.png").status_code, 404)
+
+    def test_only_billing_staff(self):
+        waiter = client_for(make_staff(self.restaurant, "WAITER"))
+        self.assertEqual(waiter.get(f"/billing/{self.bill.pk}/upi/screen/").status_code, 403)
+        self.assertEqual(waiter.post(f"/billing/{self.bill.pk}/upi/paid/", **HTMX).status_code, 403)
+        self.bill.refresh_from_db()
+        self.assertEqual(self.bill.paid_amount, D("0"))
+
+
 class BillingFlowTests(TestCase):
     def setUp(self):
         self.restaurant = make_restaurant()

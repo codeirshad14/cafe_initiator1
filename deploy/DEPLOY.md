@@ -86,6 +86,29 @@ sudo certbot --nginx -d order.example.com       # HTTPS + redirect, renews itsel
 Open `https://order.example.com/`: you should see the website. `/login/` is
 for staff, and `/admin/` is where you (the developer) set up restaurants and memberships.
 
+## A new restaurant
+
+1. `/admin/` > Restaurants > Add: the name, its web address (slug), the restaurant admin's
+   **email and password**, and the membership. Save. That email is now its admin login.
+2. The restaurant admin opens `/login/`, types that email and password and ticks
+   **Sign in as restaurant admin**.
+3. The first login opens **Create Update Profile** ("Step 1 of 2"): address and phone (and
+   GSTIN, FSSAI, logo). Saving it goes on to **Staff**, where the admin adds the cashier,
+   waiter, kitchen and rider logins (they log in without the tick).
+
+Nothing else is set in `/admin/`. To reset a restaurant admin's password, open the
+restaurant there and type a new **Admin login password**.
+
+## When a page shows error 500 or a login will not go in
+
+```bash
+cd /srv/resto && sudo -u resto venv/bin/python manage.py check_setup
+```
+
+It checks `.env`, the database and its migrations, the static files, `media/` and the
+cache, and every restaurant's admin login, and prints OK or FAIL with the fix. It
+changes nothing. Then `sudo journalctl -u resto -n 80 --no-pager` shows the error itself.
+
 ## `DEBUG=False` checklist
 
 - [ ] `DEBUG=False` in `.env`. With `True`, error pages show your settings to anyone.
@@ -101,8 +124,10 @@ for staff, and `/admin/` is where you (the developer) set up restaurants and mem
 - [ ] `collectstatic` was run after the last update, and Nginx serves `/static/` (CSS loads).
       With `DEBUG=False` the CSS and JS names carry a fingerprint (`app.7709642c.css`):
       without `collectstatic` the pages answer with error 500.
-- [ ] `/srv/resto/cache/` exists and the `resto` user can write it (the count of wrong
-      passwords: 5 for an email, then 15 minutes' wait, shared by all Gunicorn workers).
+- [ ] The `cache/` folder in the project exists and the `resto` user can write it (the count
+      of wrong passwords: 5 for an email, then 15 minutes' wait, shared by all Gunicorn
+      workers). If it cannot, logins still work, without the count, and the log says so.
+- [ ] `python manage.py check_setup` says "All good."
 - [ ] `.env` is `chmod 600`, and is not in git (`.gitignore` already lists it).
 - [ ] HTTPS works and `http://` redirects to `https://` (certbot does this).
 - [ ] Backups run (below), and you have tried restoring one once.
@@ -138,4 +163,5 @@ sudo systemctl restart resto
 | QR opens the wrong address | `SITE_URL`, then print the QR sheet again |
 | Photo upload fails | dish photos are up to 5 MB; `client_max_body_size 8M` in Nginx; `media/` must be writable by `resto` |
 | Every page is error 500 after an update | `collectstatic` was not run (the fingerprinted CSS is missing) |
-| "Too many wrong passwords" | wait 15 minutes, or empty `/srv/resto/cache/` to let everyone try again |
+| "Too many wrong passwords" | wait 15 minutes, or empty the project's `cache/` folder to let everyone try again |
+| A login will not go in | `python manage.py check_setup` (an email used by two logins, no password, membership ended …) |

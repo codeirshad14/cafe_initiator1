@@ -7,6 +7,8 @@
                 <h3 class="table-card-name">{% if t.is_takeaway %}<i class="bi bi-bag-check" aria-hidden="true"></i> {% endif %}{{ t.name }}</h3>
                 {% if t.is_takeaway %}
                 <small class="truncate">Takeaway &amp; delivery · its QR is the Order menu's</small>
+                {% elif t.is_common %}
+                <small class="truncate">Dine in from the public menu without a table</small>
                 {% else %}
                 <small class="truncate">{{ t.section|default:"No section" }} · {{ t.capacity }} seat{{ t.capacity|pluralize }}</small>
                 {% endif %}

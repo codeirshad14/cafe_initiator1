@@ -1,0 +1,36 @@
+{% comment %}
+The feedback form on a cafe's website. Sent by HTMX; errors come back in this same form,
+success swaps in _feedback_thanks.html. The stars are radio buttons 5 … 1 drawn right to
+left, so the CSS lights every star up to the one picked (.star-pick).
+{% endcomment %}
+<form hx-post="{% url 'web:cafe_feedback' restaurant.slug %}" hx-target="#feedbackBox" hx-disabled-elt="find button[type=submit]" novalidate>
+    <h3 class="cta-card-title">How was your visit?</h3>
+
+    <fieldset class="field-block{% if form.rating.errors %} has-error{% endif %}">
+        <legend class="form-label">Your rating <span class="req" aria-hidden="true">*</span></legend>
+        <div class="star-pick">
+            {% for value, label in form.rating.field.choices %}
+            <input type="radio" name="rating" value="{{ value }}" id="star{{ value }}"{% if form.rating.value|stringformat:"s" == value|stringformat:"s" %} checked{% endif %}>
+            <label for="star{{ value }}" title="{{ label }}"><i class="bi bi-star-fill" aria-hidden="true"></i><span class="visually-hidden">{{ label }}</span></label>
+            {% endfor %}
+        </div>
+        {% for error in form.rating.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </fieldset>
+
+    {% include "partials/_field.html" with field=form.message %}
+    <div class="field-row">
+        {% include "partials/_field.html" with field=form.name %}
+        {% include "partials/_field.html" with field=form.phone %}
+    </div>
+
+    {# spam trap: hidden from people, robots fill it in #}
+    <div class="trap" aria-hidden="true">
+        <label for="{{ form.website.id_for_label }}">Leave this empty</label>
+        {{ form.website }}
+    </div>
+
+    <button class="btn btn-primary btn-lg w-100" type="submit">
+        Send feedback <i class="bi bi-send" aria-hidden="true"></i>
+    </button>
+    <p class="cta-small">{{ restaurant.name }} reads every message. Your number is only for a call back, never shown.</p>
+</form>

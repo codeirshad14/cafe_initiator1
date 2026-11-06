@@ -1,0 +1,18 @@
+{# the side panel when a new cafe tries Add staff before its profile is done (core.views.staff_add) #}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">First your cafe profile</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+<div class="side-panel-body">
+    <div class="onboard-steps">
+        <span class="onboard-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
+        <div>
+            <strong>Step 1 of 2</strong>
+            <p>Fill in your {{ restaurant.profile_missing|join:" and " }} and save. Then you can add your staff here.</p>
+        </div>
+    </div>
+</div>
+<div class="side-panel-foot">
+    <button type="button" class="btn btn-light" data-bs-dismiss="offcanvas">Close</button>
+    <a class="btn btn-primary" href="{% url 'core:restaurant_settings' %}"><i class="bi bi-shop" aria-hidden="true"></i> Create Update Profile</a>
+</div>

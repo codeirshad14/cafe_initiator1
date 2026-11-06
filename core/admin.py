@@ -65,11 +65,7 @@ class StaffAdminForm(forms.ModelForm):
         if not login and not email:
             raise forms.ValidationError("Pick a login from the list, or type a new email and password.")
         if email:
-            restaurant_email = (self.data.get("email") or "").strip().lower()  # the Restaurant tab, same page
-            if self.prefix and email == restaurant_email:
-                self.add_error("new_email", "This is the restaurant admin's login (the email on the Restaurant tab). "
-                                            "Use another email for this staff login.")
-            elif User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
+            if login_taken(email):
                 self.add_error("new_email", "A login with this email already exists. Pick it from the list instead.")
             if not password:
                 self.add_error("new_password", "Give the new login a password.")
@@ -143,7 +139,8 @@ class RestaurantAdminForm(forms.ModelForm):
             self.fields["email"].required = True
             self.fields["email"].help_text = "The restaurant admin logs in with this email (and ticks “Sign in as restaurant admin”)."
             self.fields["admin_password"].required = True
-            self.fields["admin_password"].help_text = "The restaurant admin's password. Other logins: the Staff tab."
+            self.fields["admin_password"].help_text = ("The restaurant admin's password. The cafe adds its other "
+                                                       "logins itself, in the app (Staff).")
 
     def moves_login(self, email):
         """The admin login gets this email: a new login is made, or the email was changed here
@@ -188,15 +185,6 @@ class RestaurantAdminForm(forms.ModelForm):
         user.save()
 
 
-class StaffInline(admin.TabularInline):
-    """The restaurant's logins, right in the Restaurant form."""
-
-    model = Staff
-    form = StaffAdminForm
-    extra = 1
-    fields = ["login", "new_email", "new_password", "name", "phone", "role", "is_active"]
-
-
 class LocationInline(admin.TabularInline):
     """The restaurant's outlets, in the Restaurant form (the cafe adds its own in Cafe profile > Locations)."""
 
@@ -225,21 +213,37 @@ class RestaurantAdmin(admin.ModelAdmin):
     search_fields = ["name", "slug", "phone", "gstin"]
     date_hierarchy = "membership_end"
     prepopulated_fields = {"slug": ["name"]}
-    fieldsets = [
-        ("Restaurant", {"fields": ["name", "slug", "email", "admin_password", "address", "phone", "gstin", "gst_percent",
-                                   "fssai_no", "logo"]}),
-        ("Delivery & bookings", {
-            "fields": ["delivery_enabled", ("delivery_charge", "free_delivery_above"), "booking_enabled"],
+    # what we (the developer) set: the restaurant, its web address, its admin login and the membership.
+    # Everything else is the cafe's own: its admin fills it in after the first login (Create Update
+    # Profile) and adds the staff logins there too. Shown on Change, to help when they ask.
+    ours = [
+        ("Restaurant & admin login", {
+            "fields": ["name", "slug", "email", "admin_password"],
+            "description": "The restaurant admin logs in at /login/ with this email and password (ticking "
+                           "“Sign in as restaurant admin”), fills in the cafe profile, then adds the staff logins.",
+        }),
+        ("Membership", {"fields": ["tier", "plan", "membership_start", "membership_end", "max_users", "is_active"]}),
+    ]
+    theirs = [
+        ("Cafe profile (filled in by the cafe)", {
+            "fields": ["address", "phone", "gstin", "gst_percent", "fssai_no", "logo", "delivery_enabled",
+                       ("delivery_charge", "free_delivery_above"), "booking_enabled"],
         }),
         ("Public menu slider", {
             "fields": [("slide_1", "slide_1_text"), ("slide_2", "slide_2_text"), ("slide_3", "slide_3_text")],
             "description": "Slide 1 on the public menu is the restaurant itself (name, address, logo). "
                            "These photos come after it and slide by themselves. Wide photos (about 2:1), up to 2 MB.",
         }),
-        ("Membership", {"fields": ["tier", "plan", "membership_start", "membership_end", "max_users", "is_active"]}),
     ]
-    inlines = [LocationInline, StaffInline]
     actions = ["renew_membership"]
+
+    def get_fieldsets(self, request, obj=None):
+        return self.ours if obj is None else self.ours + self.theirs
+
+    def get_inlines(self, request, obj):
+        """The outlets, once the restaurant exists (the cafe adds its own in Cafe profile > Locations).
+        No staff here: the cafe's admin adds its staff logins in the app (Staff)."""
+        return [] if obj is None else [LocationInline]
 
     def get_queryset(self, request):
         # count each restaurant's active logins in the same query

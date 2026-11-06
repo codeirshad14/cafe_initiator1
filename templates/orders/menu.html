@@ -28,7 +28,7 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
                     {% if at_table %}
                     <small><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ table.label }}{% if table.section %} · {{ table.section }}{% endif %}</small>
                     {% elif ordering %}
-                    <small><i class="bi bi-bag-check" aria-hidden="true"></i> Take away{% if restaurant.delivery_enabled %} · Delivery{% endif %}</small>
+                    <small><i class="bi bi-bag-check" aria-hidden="true"></i> Dine in · Take away{% if restaurant.delivery_enabled %} · Delivery{% endif %}</small>
                     {% else %}
                     <small>{{ dish_count }} dishes · {{ categories|length }} categories</small>
                     {% endif %}
@@ -56,7 +56,7 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
         <div class="gm-slides" data-slides tabindex="0">
             <div class="gm-slide gm-banner" aria-roledescription="slide" aria-label="1 of {{ slides|length|add:1 }}">
                 <div class="gm-banner-text">
-                    <span class="gm-banner-kicker">{% if at_table %}Welcome to {{ table.label }}{% elif ordering %}Order take-away{% if restaurant.delivery_enabled %} or delivery{% endif %}{% else %}Our menu{% endif %}</span>
+                    <span class="gm-banner-kicker">{% if at_table %}Welcome to {{ table.label }}{% elif ordering %}Dine in, take away{% if restaurant.delivery_enabled %} or delivery{% endif %}{% else %}Our menu{% endif %}</span>
                     <h1>{{ restaurant.name }}</h1>
                     {% if at_table %}
                     <p>Pick your dishes and order from your phone. It goes straight to the kitchen.</p>
@@ -85,6 +85,18 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
         {% endif %}
     </section>
     {% endwith %}
+
+    {# the public menu: how the guest wants it, picked here or on the cart (orders.guest_views.render_menu) #}
+    {% if order_types %}
+    <nav class="gm-types" aria-label="How would you like it?">
+        {% for code, label, icon in order_types %}
+        <a class="gm-type{% if code == order_type %} is-on{% endif %}" href="?{% if location_query %}{{ location_query }}&amp;{% endif %}type={{ code }}"
+           {% if code == order_type %}aria-current="true"{% endif %}>
+            <i class="bi bi-{{ icon }}" aria-hidden="true"></i> {{ label }}
+        </a>
+        {% endfor %}
+    </nav>
+    {% endif %}
 
     {% if my_order and my_order.status == "BILLED" %}
     <div class="c-notice c-notice--info gm-notice" role="status">

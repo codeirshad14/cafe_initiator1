@@ -148,9 +148,35 @@ class PortionOrderTests(TestCase):
     def test_another_dishes_portion_is_not_found(self):
         self.assertEqual(self.add(self.naan, self.half).status_code, 404)
 
+    def test_every_menu_shows_a_button_per_size_with_its_price(self):
+        """The table's QR menu, the public menu (take away) and the view-only menu alike."""
+        for menu in (self.menu, f"/r/{self.restaurant.slug}/"):
+            with self.subTest(menu=menu):
+                page = self.guest.get(menu)
+                self.assertContains(page, 'class="gm-ctl gm-portions"')
+                self.assertContains(page, 'aria-label="Add Paneer Tikka Half, ₹179"')
+                self.assertContains(page, 'aria-label="Add Paneer Tikka Full, ₹329"')
+        view_only = self.guest.get(f"/r/{self.restaurant.slug}/view/")
+        self.assertContains(view_only, '<span class="gm-portion is-static" role="listitem"><b>Half</b><small>₹179</small></span>', html=True)
+        self.assertNotContains(view_only, "cart/add")
+
+    def test_a_size_button_adds_one_of_that_size(self):
+        """Half, Half, Full: two Half and one Full in the order, each size counting on its own button."""
+        self.add(self.dish, self.half)
+        response = self.add(self.dish, self.half)
+        self.assertContains(response, 'class="gm-portion is-on"', count=1)
+        self.assertContains(response, "<small>× 2</small>")  # Half × 2; Full still "Add"
+        self.assertContains(response, 'aria-label="Add Paneer Tikka Full, ₹329"')
+        self.add(self.dish, self.full)
+        menu = self.guest.get(self.menu)
+        self.assertContains(menu, 'class="gm-portion is-on"', count=2)
+        # − on Half: one Half left
+        response = self.guest.post(f"{self.menu}cart/remove/{self.dish.pk}/", {"portion": self.half.pk}, **HTMX)
+        self.assertContains(response, "<small>× 1</small>")
+        self.assertContains(self.guest.get(f"{self.menu}cart/"), "Paneer Tikka (Half)")
+
     def test_menu_card_opens_details_with_the_sizes(self):
         menu = self.guest.get(self.menu)
-        self.assertContains(menu, "2 sizes")
         self.assertContains(menu, f'id="ctl-{self.dish.pk}"')
         sheet = self.guest.get(f"{self.menu}dish/{self.dish.pk}/", **HTMX)
         self.assertContains(sheet, 'class="gm-sheet"')
@@ -182,6 +208,93 @@ class PortionOrderTests(TestCase):
         self.assertEqual(self.guest.get(f"{self.menu}dish/{self.naan.pk}/", **HTMX).status_code, 404)
 
 
+class PublicMenuDineInTests(TestCase):
+    """The public menu (/r/<slug>/): Dine in · Take away · Delivery. Dine in: the guest picks
+    their table, or none and the order goes on the location's Common table, never full."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant()
+        _, self.paneer, self.naan = make_menu(self.restaurant)
+        self.t1 = make_table(self.restaurant, "T1")
+        self.t2 = make_table(self.restaurant, "T2")
+        from tables.models import takeaway_table
+        self.counter = takeaway_table(self.restaurant)
+        self.public = "/r/spice-garden/"
+
+    def order(self, guest, **details):
+        guest.post(f"/m/{self.counter.qr_token}/cart/add/{self.naan.pk}/", **HTMX)
+        return guest.post(f"/m/{self.counter.qr_token}/place/", {"order_type": "DINE_IN", **details})
+
+    def test_three_ways_on_the_public_menu_and_the_cart_remembers(self):
+        guest = Client()
+        page = guest.get(self.public)
+        for way in ("Dine in", "Take away", "Delivery"):
+            self.assertContains(page, f"</i> {way}")
+        self.assertContains(page, 'class="gm-type is-on"', count=1)  # Dine in, first
+        guest.get(self.public + "?type=TAKEAWAY")
+        guest.post(f"/m/{self.counter.qr_token}/cart/add/{self.naan.pk}/", **HTMX)
+        cart = guest.get(f"/m/{self.counter.qr_token}/cart/")
+        self.assertRegex(cart.content.decode(), r'<input type="radio" name="order_type" value="TAKEAWAY"[^>]* checked')
+        self.assertContains(cart, "No table · the common table")
+        self.assertContains(cart, f'<option value="{self.t1.pk}">T1</option>', html=True)
+        self.assertNotContains(cart, f'<option value="{self.counter.pk}"')  # never the counter
+
+    def test_dine_in_at_the_table_picked(self):
+        response = self.order(Client(), table=self.t2.pk, customer_name="Meera")
+        order = Order.objects.get()
+        self.assertEqual((order.table, order.order_type, order.customer_name), (self.t2, "DINE_IN", "Meera"))
+        self.assertIn("/track/", response["Location"])
+
+    def test_no_table_picked_goes_on_the_common_table_and_never_shares_a_bill(self):
+        self.order(Client())
+        self.order(Client(), customer_name="Ravi")
+        orders = list(Order.objects.order_by("pk"))
+        self.assertEqual(len(orders), 2)  # two strangers: two orders, two bills
+        common = orders[0].table
+        self.assertTrue(common.is_common)
+        self.assertEqual((orders[1].table, orders[0].customer_name), (common, "Guest at Common table"))
+        self.assertEqual(KOT.objects.count(), 2)
+
+    def test_a_guest_adds_to_only_their_own_order_on_the_common_table(self):
+        meera, ravi = Client(), Client()
+        self.order(meera, customer_name="Meera")
+        self.order(ravi, customer_name="Ravi")
+        common = Order.objects.first().table
+        # Meera orders more from the common table's menu: her own order grows, Ravi's is never offered
+        meera.post(f"/m/{common.qr_token}/cart/add/{self.paneer.pk}/", **HTMX)
+        cart = meera.get(f"/m/{common.qr_token}/cart/")
+        self.assertContains(cart, "Add to my order")
+        self.assertNotContains(cart, "Ravi")
+        meera.post(f"/m/{common.qr_token}/place/", {"order_type": "DINE_IN"})
+        self.assertEqual(Order.objects.get(customer_name="Meera").kots.count(), 2)
+        # someone new on the common table's QR: a new order of their own, not the oldest one
+        stranger = Client()
+        stranger.post(f"/m/{common.qr_token}/cart/add/{self.naan.pk}/", **HTMX)
+        self.assertNotContains(stranger.get(f"/m/{common.qr_token}/cart/"), "Meera")
+        stranger.post(f"/m/{common.qr_token}/place/", {"order_type": "DINE_IN"})
+        self.assertEqual(Order.objects.filter(table=common).count(), 3)
+        # staff see every order on it, to add to the right one
+        waiter = client_for(make_staff(self.restaurant, "WAITER"))
+        screen = waiter.get(f"/waiter/order/{common.pk}/")
+        self.assertContains(screen, "Meera")
+        self.assertContains(screen, "Ravi")
+
+    def test_take_away_and_delivery_still_go_to_the_counter(self):
+        guest = Client()
+        guest.post(f"/m/{self.counter.qr_token}/cart/add/{self.naan.pk}/", **HTMX)
+        guest.post(f"/m/{self.counter.qr_token}/place/", {"order_type": "TAKEAWAY", "table": self.t1.pk})
+        order = Order.objects.get()
+        self.assertEqual((order.table, order.order_type), (self.counter, "TAKEAWAY"))
+
+    def test_a_table_qr_works_as_before(self):
+        guest = Client()
+        guest.post(f"/m/{self.t1.qr_token}/cart/add/{self.naan.pk}/", **HTMX)
+        cart = guest.get(f"/m/{self.t1.qr_token}/cart/")
+        self.assertNotContains(cart, "No table · the common table")  # the table is known
+        guest.post(f"/m/{self.t1.qr_token}/place/", {"order_type": "DINE_IN"})
+        self.assertEqual(Order.objects.get().table, self.t1)
+
+
 class PosScreenTests(TestCase):
     """The staff order screen works like a POS: tap a tile to add; − qty + on the tile,
     on each size and on the bill lines."""
@@ -195,12 +308,14 @@ class PosScreenTests(TestCase):
         self.waiter = client_for(make_staff(self.restaurant, "WAITER"))
         self.screen = f"/waiter/order/{self.table.pk}/"
 
-    def test_tiles_and_the_size_menu(self):
+    def test_tiles_and_the_sizes_on_the_tile(self):
         page = self.waiter.get(self.screen)
-        self.assertContains(page, 'class="pos-tile food-veg"', count=2)  # Paneer (opens its sizes) and Naan
-        self.assertContains(page, "1 size · from")
+        self.assertContains(page, 'class="pos-tile food-veg"', count=1)  # Naan: a tap on the tile adds one
+        self.assertContains(page, 'class="pos-tile pos-tile--sizes food-veg"', count=1)  # Paneer: its sizes on the tile
+        self.assertNotContains(page, "data-bs-toggle=\"dropdown\" data-bs-auto-close")  # no menu to open first
         self.assertContains(page, f'id="step-{self.naan.pk}" hidden')  # no − qty + until it is in the round
         self.assertContains(page, f'id="step-{self.paneer.pk}-{self.half.pk}"')  # each size: Add, then − qty +
+        self.assertContains(page, '<span class="pos-size-name"><span>Half</span> <strong>₹179</strong></span>', html=True)
         self.assertContains(page, "All items <small>2</small>")
 
     def test_a_tap_sends_back_the_lines_the_tile_stepper_and_the_total(self):

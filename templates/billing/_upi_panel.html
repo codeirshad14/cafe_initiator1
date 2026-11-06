@@ -1,0 +1,51 @@
+{% load money %}
+{% comment %}
+Take payment > Show UPI QR (billing.views.bill_upi), in the side panel: the QR code with
+the balance in it for the guest to scan, the same big on a second screen ("Customer
+screen"), then "Paid by UPI" records the payment and closes the panel.
+{% endcomment %}
+<div class="side-panel-head">
+    <h2 id="sidePanelTitle">UPI · Bill #{{ bill.bill_no }}</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+</div>
+<div class="side-panel-body upi-panel">
+    {% if paid %}
+    <div class="paid-box">
+        <span class="empty-icon empty-icon--ok"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+        <strong>Nothing left to pay</strong>
+        <span>Bill #{{ bill.bill_no }} is fully paid.</span>
+    </div>
+    {% elif can_make_qr %}
+    <p class="upi-amount"><small>Scan and pay</small> {{ amount|inr }}</p>
+    {# ?v= the amount: a new picture whenever the balance changes #}
+    <img class="upi-qr" src="{% url 'billing:bill_upi_qr' bill.pk %}?v={{ amount }}" alt="UPI QR code for {{ amount|inr }}" width="260" height="260">
+    <p class="upi-to">To <strong>{{ restaurant.bill_name }}</strong> · {{ restaurant.upi_id }}</p>
+    <p class="form-hint text-center">Any UPI app: GPay, PhonePe, Paytm, BHIM. The amount is filled in for the guest.</p>
+    <a class="btn btn-light w-100" href="{% url 'billing:bill_upi_screen' bill.pk %}" target="upiScreen" rel="noopener">
+        <i class="bi bi-display" aria-hidden="true"></i> Customer screen (a second screen)
+    </a>
+    {% elif own_qr %}
+    <p class="upi-amount"><small>Ask the guest to pay</small> {{ amount|inr }}</p>
+    <img class="upi-qr" src="{{ own_qr.url }}" alt="UPI QR code of {{ restaurant.name }}">
+    <div class="c-notice c-notice--info gm-notice" role="note">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+        <span>This is your own QR picture: the guest types {{ amount|inr }}. Add your <strong>UPI ID</strong> in Cafe profile &gt; Bill &amp; print, and the code fills in the amount by itself.</span>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-qr-code" aria-hidden="true"></i></span>
+        <h3>No UPI ID yet</h3>
+        <p>The admin adds the cafe's UPI ID (e.g. name@okicici) in <strong>Cafe profile &gt; Bill &amp; print</strong>. Then this shows a QR code with the amount in it.</p>
+        {% if current_staff.works_everywhere %}<a class="btn btn-primary" href="{% url 'core:bill_settings' %}">Add the UPI ID</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% if can_record %}
+{# the guest's app says "Paid": record it (the whole balance, as UPI) #}
+<form class="side-panel-foot upi-paid" hx-post="{% url 'billing:bill_upi_paid' bill.pk %}" hx-target="#payBox" hx-swap="outerHTML"
+      hx-disabled-elt="find button[type=submit]">
+    <label class="visually-hidden" for="upiRef">UPI reference (UTR), optional</label>
+    <input type="text" class="form-control" id="upiRef" name="reference_no" maxlength="50" placeholder="UPI reference / UTR (optional)" autocomplete="off">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check2" aria-hidden="true"></i> Paid by UPI · {{ amount|inr }}</button>
+</form>
+{% endif %}
