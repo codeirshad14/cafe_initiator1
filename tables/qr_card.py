@@ -12,7 +12,7 @@ QR cards at shop counters, about A6 / postcard size (620 x 880 px), ready to pri
     │   Scan me for Menu   │  the line guests read (MENU_QRS / TABLE_CARD "label")
     │  Point your camera…  │
     │      [ Table T1 ]    │  a table's name ("No app needed" on the menu cards)
-    │  Powered by Mr Cafe  │
+    │ Powered by Mr Cafe … │  one row, small: "… (www.cafe.initiatorsolutions.com)"
     └──────────────────────┘
 """
 
@@ -35,6 +35,12 @@ FONTS = {
     True: ["DejaVuSans-Bold.ttf", "arialbd.ttf", "segoeuib.ttf"],
     False: ["DejaVuSans.ttf", "arial.ttf", "segoeui.ttf"],
 }
+
+
+def powered_by():
+    """The card's foot: "Powered by Mr Cafe (www.cafe.initiatorsolutions.com)"."""
+    site = f" ({settings.BRAND_SITE})" if settings.BRAND_SITE else ""
+    return f"Powered by {settings.BRAND_NAME}{site}"
 
 
 def font(size, bold=False):
@@ -108,9 +114,11 @@ def qr_card_png(text, cafe_name, band, label, help_text, table_name=""):
     draw.rounded_rectangle([left, 714, left + chip_width, 764], radius=25, fill=colours[0])
     centred(draw, 739 - chip.size * 0.55, words, chip, colours[1])
 
-    # 5. the foot
+    # 5. the foot: one row of small text
     draw.rectangle([0, HEIGHT - 64, WIDTH, HEIGHT], fill=PAGE)
-    centred(draw, HEIGHT - 44, f"Powered by {settings.BRAND_NAME}", font(18), INK_3)
+    foot = powered_by()
+    small = fitting_font(draw, foot, 16, WIDTH - 40)
+    centred(draw, HEIGHT - 32 - small.size * 0.6, foot, small, INK_3)
 
     buffer = BytesIO()
     card.save(buffer, "PNG", dpi=(150, 150))  # 620 x 880 px at 150 dpi: about 10.5 x 15 cm

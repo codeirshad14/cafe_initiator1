@@ -120,6 +120,13 @@ class MenuQrTests(TestCase):
         plain = Image.open(BytesIO(manager.get("/tables/menu-qr/view.png?download=1").content))
         self.assertLess(plain.size[0], 620)  # "QR" alone is still the bare code
 
+    def test_the_card_foot_is_one_small_row_with_the_website(self):
+        from PIL import Image, ImageDraw
+        from tables.qr_card import WIDTH, fitting_font, powered_by
+        self.assertEqual(powered_by(), "Powered by Mr Cafe (www.cafe.initiatorsolutions.com)")
+        draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        self.assertLessEqual(draw.textlength(powered_by(), font=fitting_font(draw, powered_by(), 16, WIDTH - 40)), WIDTH - 40)
+
 
 class StaffBookingTests(TestCase):
     """Staff: add a phone booking, give a table, confirm, seat; the floor shows it."""

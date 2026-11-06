@@ -44,11 +44,14 @@ def menu_qr_url(request, location, kind):
     return full_url(request, public_path(MENU_QRS[kind]["url_name"], location))
 
 
-def qr_png_bytes(text):
-    """A black-on-white QR code for `text`, as PNG bytes."""
+def qr_png_bytes(text, width=None):
+    """A black-on-white QR code for `text`, as PNG bytes. width: at most that many
+    pixels wide, at whole pixels a square (sharp on a thermal printer)."""
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
     qr.add_data(text)
     qr.make(fit=True)
+    if width:
+        qr.box_size = max(1, width // (qr.modules_count + 2 * qr.border))
     image = qr.make_image(fill_color="black", back_color="white")
     buffer = BytesIO()
     image.save(buffer)

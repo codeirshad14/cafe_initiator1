@@ -66,7 +66,11 @@
     {% if restaurant.shows_upi_on_bill and bill.is_open_for_payment %}
     <div class="slip-upi">
         <div class="slip-center slip-head">Scan &amp; pay by UPI</div>
-        {% if restaurant.upi_qr %}<img class="slip-upi-qr" src="{{ restaurant.upi_qr.url }}" alt="UPI QR code">{% endif %}
+        {% if amount_qr %}
+        {# made for this bill: the guest's UPI app opens with the amount filled in #}
+        <img class="slip-upi-qr" src="{{ amount_qr }}" alt="UPI QR code for {{ bill.balance|inr }}">
+        <div class="slip-center slip-head">Amount: {{ bill.balance|inr }}</div>
+        {% elif restaurant.upi_qr %}<img class="slip-upi-qr" src="{{ restaurant.upi_qr.url }}" alt="UPI QR code">{% endif %}
         {% if restaurant.upi_id %}<div class="slip-center">UPI ID: {{ restaurant.upi_id }}</div>{% endif %}
     </div>
     <div class="slip-rule"></div>

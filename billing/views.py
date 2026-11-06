@@ -22,7 +22,7 @@ from tables.models import takeaway_table
 from .forms import BillCancelForm, BillFilterForm, DiscountForm, PaymentForm
 from .models import Bill, Payment
 from .printing import bill_slip
-from .upi import bill_upi_png
+from .upi import bill_upi_data_uri, bill_upi_png, prints_amount_qr
 from .services import (
     BillingError, add_payments, cancel_bill, make_bill, offer_for, preview_totals, remove_payment, reopen_order,
 )
@@ -308,13 +308,15 @@ def bill_cancel(request, pk):
 
 @role_required(*roles.BILL_VIEW)
 def bill_print(request, pk):
-    """80 mm bill for the thermal printer. Prints on open."""
+    """80 mm bill for the thermal printer. Prints on open. While something is left to pay,
+    the UPI QR code has the amount in it (written into the page, so it is there before printing)."""
     bill = get_bill(request, pk)
     return render(request, "print/bill.html", {
         "bill": bill,
         "restaurant": bill.restaurant,
         "items": bill.items.all(),
         "payments": bill.payments.all(),
+        "amount_qr": bill_upi_data_uri(bill) if prints_amount_qr(bill) else "",
     })
 
 

@@ -963,12 +963,28 @@ class BillSettingsTests(TestCase):
         self.restaurant.refresh_from_db()
         self.assertEqual(self.restaurant.upi_id, "spicegarden@okicici")
 
+        from core.templatetags.money import inr
+        amount = inr(self.bill.balance)
         page = self.admin.get(f"/billing/{self.bill.pk}/print/")
         self.assertContains(page, 'class="slip-logo"')
+        # with a UPI ID the QR code is made for this bill, with the amount in it (not the uploaded picture)
+        self.assertContains(page, 'class="slip-upi-qr" src="data:image/png;base64,')
+        self.assertContains(page, f"Amount: {amount}")
+        self.assertNotContains(page, "/upi/upi")
         self.assertContains(page, "UPI ID: spicegarden@okicici")
         slip = self.admin.get(f"/billing/{self.bill.pk}/print/slip/").content
-        self.assertEqual(slip.count(b"\x1dv0\x00"), 2)  # two pictures: the logo and the QR code
+        self.assertGreater(slip.count(b"\x1dv0\x00"), 1)  # the logo (one band), then the QR code
+        self.assertIn(f"Amount: {amount}".replace("₹", "Rs.").encode(), slip)
         self.assertIn(b"UPI ID: spicegarden@okicici", slip)
+        settings_page = self.admin.get("/restaurant/bill/")
+        self.assertContains(settings_page, 'class="bill-preview-qr" src="data:image/png;base64,')
+
+        from billing.models import Payment
+        from billing.services import add_payments
+        add_payments(self.bill, [(Payment.Mode.CASH, self.bill.balance, "")], None)
+        page = self.admin.get(f"/billing/{self.bill.pk}/print/")
+        self.assertNotContains(page, "Scan &amp; pay by UPI")  # paid: nothing to scan
+        self.assertNotIn(b"Scan & pay", self.admin.get(f"/billing/{self.bill.pk}/print/slip/").content)
 
         self.save(upi_id="spicegarden@okicici", print_logo="", print_upi="")
         slip = self.admin.get(f"/billing/{self.bill.pk}/print/slip/").content

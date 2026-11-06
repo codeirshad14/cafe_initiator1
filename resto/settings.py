@@ -142,6 +142,8 @@ SITE_URL = config("SITE_URL", default="")
 
 # the product's name: website, login page, staff sidebar, Django admin header
 BRAND_NAME = config("BRAND_NAME", default="Mr Cafe")
+# the product's website, in "Powered by Mr Cafe (www.cafe.initiatorsolutions.com)" on the QR labels
+BRAND_SITE = config("BRAND_SITE", default="www.cafe.initiatorsolutions.com")
 
 # shown in the website's contact section (left out when empty)
 CONTACT_PHONE = config("CONTACT_PHONE", default="")

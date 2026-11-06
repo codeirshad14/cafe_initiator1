@@ -1,10 +1,13 @@
 """The bill as a thermal-printer slip (ESC/POS bytes): the same as print/bill.html.
 What it shows is set in Cafe profile > Bill & print (name, title, logo, tax lines, UPI)."""
 
+from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from core.escpos import Slip
 from core.templatetags.money import inr, percent
+
+from .upi import bill_upi_png, prints_amount_qr
 
 ITEM_COLUMNS = (24, 5, 9, 10)  # Item, Qty, Rate, Amt: 48 characters
 LOGO_DOTS = 384  # 48 mm wide at most
@@ -80,7 +83,10 @@ def bill_slip(bill):
 
     if restaurant.shows_upi_on_bill and bill.is_open_for_payment:
         slip.text("Scan & pay by UPI", center=True, bold=True)
-        if restaurant.upi_qr:
+        if prints_amount_qr(bill):  # made for this bill: the UPI app opens with the amount filled in
+            slip.image(ContentFile(bill_upi_png(bill, UPI_QR_DOTS)), UPI_QR_DOTS, sharp=True)
+            slip.text(f"Amount: {inr(bill.balance)}", center=True, bold=True)
+        elif restaurant.upi_qr:
             slip.image(restaurant.upi_qr, UPI_QR_DOTS, sharp=True)
         if restaurant.upi_id:
             slip.text(f"UPI ID: {restaurant.upi_id}", center=True)

@@ -11,7 +11,7 @@ guest has paid, the cashier records it as a UPI payment (one tap).
 
 from urllib.parse import quote
 
-from tables.qr import qr_png_bytes
+from tables.qr import qr_data_uri, qr_png_bytes
 
 
 def upi_link(restaurant, amount, note=""):
@@ -22,7 +22,24 @@ def upi_link(restaurant, amount, note=""):
     return "upi://pay?" + "&".join(f"{key}={quote(str(value), safe='@.-_')}" for key, value in params)
 
 
-def bill_upi_png(bill):
-    """The QR code of the bill's balance, as PNG bytes."""
-    note = f"Bill {bill.bill_no} {bill.restaurant.name}"
-    return qr_png_bytes(upi_link(bill.restaurant, bill.balance, note))
+def bill_upi_link(bill):
+    """The link for the bill's balance (what is still to pay)."""
+    return upi_link(bill.restaurant, bill.balance, f"Bill {bill.bill_no} {bill.restaurant.name}")
+
+
+def bill_upi_png(bill, width=None):
+    """The QR code of the bill's balance, as PNG bytes (width: see qr_png_bytes)."""
+    return qr_png_bytes(bill_upi_link(bill), width)
+
+
+def prints_amount_qr(bill):
+    """The printed bill gets the QR code with the amount in it: UPI on the bill (Bill & print),
+    a UPI ID to pay to, and something left to pay. Without a UPI ID the uploaded QR picture prints."""
+    restaurant = bill.restaurant
+    return (restaurant.shows_upi_on_bill and bool(restaurant.upi_id)
+            and bill.is_open_for_payment and bill.balance > 0)
+
+
+def bill_upi_data_uri(bill):
+    """The same QR code written straight into an <img src="...">, for the printed bill."""
+    return qr_data_uri(bill_upi_link(bill))

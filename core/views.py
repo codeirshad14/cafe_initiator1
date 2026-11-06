@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -10,8 +12,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from billing.models import Bill
+from billing.upi import upi_link
 from orders.models import KOT, Order
 from tables.models import DiningTable
+from tables.qr import qr_data_uri
 
 from . import roles
 from .analytics import by_location, dashboard_figures, period_filter_context
@@ -159,7 +163,10 @@ def bill_settings(request):
             return redirect("core:bill_settings")
     else:
         form = BillSettingsForm(instance=restaurant)
-    return render(request, "core/bill_settings.html", {"form": form, "restaurant": restaurant})
+    sample_qr = ""  # the preview's QR code, as a bill of 525.00 prints it
+    if restaurant.shows_upi_on_bill and restaurant.upi_id:
+        sample_qr = qr_data_uri(upi_link(restaurant, Decimal("525.00"), f"Bill 1 {restaurant.name}"))
+    return render(request, "core/bill_settings.html", {"form": form, "restaurant": restaurant, "sample_qr": sample_qr})
 
 
 # ---------------------------------------------------------------- staff

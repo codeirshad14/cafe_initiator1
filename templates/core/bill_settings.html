@@ -30,6 +30,7 @@
 
             <p class="form-section">UPI payment</p>
             {% include "partials/_field.html" with field=form.upi_id %}
+            <p class="form-hint">With a UPI ID, each bill prints its own QR code with the amount filled in. The QR picture below prints only when there is no UPI ID.</p>
             {% if restaurant.upi_qr %}
             <div class="photo-current photo-current--qr">
                 <img src="{{ restaurant.upi_qr.url }}" alt="Current UPI QR code">
@@ -69,7 +70,10 @@
                     {% endif %}
                     <span class="bill-preview-row bill-preview-total"><span>TOTAL</span><span>₹525.00</span></span>
                     {% if restaurant.shows_upi_on_bill %}
-                    {% if restaurant.upi_qr %}<img class="bill-preview-qr" src="{{ restaurant.upi_qr.url }}" alt="">{% endif %}
+                    {% if sample_qr %}
+                    <img class="bill-preview-qr" src="{{ sample_qr }}" alt="UPI QR code for ₹525.00">
+                    <small><b>Amount: ₹525.00</b></small>
+                    {% elif restaurant.upi_qr %}<img class="bill-preview-qr" src="{{ restaurant.upi_qr.url }}" alt="">{% endif %}
                     {% if restaurant.upi_id %}<small>Pay by UPI: {{ restaurant.upi_id }}</small>{% endif %}
                     {% endif %}
                 </div>
