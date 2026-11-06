@@ -1,0 +1,126 @@
+/* The installable app's styles: the Install app button and the steps box.
+   Served by Django at /app/install.css (pwa/files.py), so they work even
+   before collectstatic. Colours and sizes come from app.css's :root. */
+
+/* the top bar's "Install app": a soft red pill (phones: in the account menu) */
+.install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin-right: 4px;
+  padding: 0 12px;
+  border: 1px solid rgba(var(--brand-rgb), 0.22);
+  border-radius: 999px;
+  background: rgba(var(--brand-rgb), 0.07);
+  color: var(--brand-solid);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.install-btn:hover {
+  border-color: rgba(var(--brand-rgb), 0.4);
+  background: rgba(var(--brand-rgb), 0.12);
+}
+.install-btn i {
+  font-size: 1rem;
+}
+/* phones: no room beside the cafe's name, so it is in the account menu instead */
+@media (max-width: 575.98px) {
+  .install-btn {
+    display: none;
+  }
+}
+.dropdown-item.install-menu-item {
+  color: var(--brand-solid);
+  font-weight: 600;
+}
+.auth-install {
+  margin: 4px 0 14px;
+}
+
+/* the steps box: where the browser has no install prompt, or the app is already installed */
+.install-help {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  width: min(400px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(29, 26, 23, 0.22);
+}
+.install-help::backdrop {
+  background: rgba(29, 26, 23, 0.45);
+}
+.install-help-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.install-help-head img {
+  flex: 0 0 auto;
+  border-radius: 12px;
+}
+.install-help-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.install-help-head p {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+.install-help-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding-left: 22px;
+  font-size: 0.92rem;
+}
+.install-help-steps[hidden],
+.install-help-done[hidden] {
+  display: none;
+}
+.install-help-steps i,
+.install-help-again i {
+  color: var(--brand-solid);
+}
+/* "already on this device": open it, it updates itself */
+.install-help-done {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--ok-soft, #e9f6ee);
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+.install-help-done > i {
+  color: var(--ok, #1f8a4c);
+  font-size: 1.1rem;
+}
+/* how to install it fresh over an old one */
+.install-help-again {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+.install-help-again summary {
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.install-help-again ol {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 20px;
+}

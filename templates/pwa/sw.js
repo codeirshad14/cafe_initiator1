@@ -4,13 +4,13 @@
    - pages, orders, bills, HTMX updates: always from the server, never stored
      (no old order on screen, no other login's page on a shared device);
      with no internet a page shows /offline/ instead of the browser's error
-   - our CSS, JS and icons (/static/): from the device at once, refreshed in
-     the background, so screens open fast
+   - our CSS, JS and icons (/static/, /app/): from the device at once, refreshed
+     in the background, so screens open fast
    - forms (POST) and other sites: not touched at all
 */
 const CACHE = "mrcafe-{{ version }}";
 const OFFLINE_URL = {{ offline_url|safe }};
-const STATIC_URL = {{ static_url|safe }};
+const FILE_PREFIXES = {{ file_prefixes|safe }};
 const PRECACHE = {{ precache|safe }};
 
 self.addEventListener("install", function (event) {
@@ -53,7 +53,7 @@ self.addEventListener("fetch", function (event) {
   }
 
   // our CSS / JS / icons: the stored copy now, a fresh one for next time
-  if (url.pathname.startsWith(STATIC_URL)) {
+  if (FILE_PREFIXES.some(function (prefix) { return url.pathname.startsWith(prefix); })) {
     event.respondWith(
       caches.open(CACHE).then(function (cache) {
         return cache.match(request).then(function (stored) {

@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static pwa_files %}<!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8">
@@ -73,7 +73,7 @@
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <script src="{% static 'js/app.js' %}"></script>
 <script src="{% static 'js/printing.js' %}"></script>
-<script src="{% static 'js/install.js' %}"></script>
+<script src="{% app_file 'install.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

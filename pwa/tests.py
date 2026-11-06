@@ -18,6 +18,11 @@ class InstallableAppTests(TestCase):
         self.assertEqual(app["theme_color"], "#da3831")
         sizes = {(icon["sizes"], icon["purpose"]) for icon in app["icons"]}
         self.assertTrue({("192x192", "any"), ("512x512", "any"), ("512x512", "maskable")} <= sizes)
+        for icon in app["icons"]:  # from /app/, never waiting for collectstatic
+            self.assertRegex(icon["src"], r"^/app/[a-z0-9-]+\.png\?v=[0-9a-f]{10}$")
+            self.assertEqual(Client().get(icon["src"]).status_code, 200)
+        self.assertEqual(app["related_applications"],
+                         [{"platform": "webapp", "url": "http://testserver/manifest.webmanifest"}])
 
     def test_every_icon_file_exists(self):
         for name in ("icon-192.png", "icon-512.png", "maskable-512.png", "apple-touch-icon.png", "favicon-32.png"):
@@ -31,7 +36,8 @@ class InstallableAppTests(TestCase):
         self.assertEqual(response["Service-Worker-Allowed"], "/")
         body = response.content.decode()
         self.assertIn('const OFFLINE_URL = "/offline/"', body)
-        self.assertIn('"/static/img/app/icon-192.png"', body)
+        self.assertRegex(body, r'"/app/icon-192.png\?v=[0-9a-f]{10}"')
+        self.assertIn('const FILE_PREFIXES = ["/static/", "/app/"]', body)
         self.assertIn('request.method !== "GET"', body)  # forms are never touched
 
     def test_offline_page_needs_nothing_from_the_internet(self):
@@ -47,7 +53,29 @@ class InstallableAppTests(TestCase):
                 self.assertContains(page, 'rel="manifest" href="/manifest.webmanifest"')
                 self.assertContains(page, "data-install-app hidden")
                 self.assertContains(page, 'id="installHelp"')
-                self.assertContains(page, "js/install.js")
+                self.assertRegex(page.content.decode(), r'<script src="/app/install.js\?v=[0-9a-f]{10}">')
+                self.assertRegex(page.content.decode(), r'href="/app/install.css\?v=[0-9a-f]{10}"')
+
+    def test_app_files_come_from_django_with_a_fingerprint(self):
+        for name, kind in (("install.js", "text/javascript"), ("install.css", "text/css"),
+                           ("icon-192.png", "image/png"), ("apple-touch-icon.png", "image/png")):
+            with self.subTest(name=name):
+                kept = Client().get(f"/app/{name}?v=abc")
+                self.assertEqual((kept.status_code, kept["Content-Type"]), (200, kind))
+                self.assertIn("immutable", kept["Cache-Control"])
+                self.assertNotIn("immutable", Client().get(f"/app/{name}")["Cache-Control"])
+        for name in ("settings.py", "../manage.py", "app.css"):  # only the app's own files
+            self.assertEqual(Client().get(f"/app/{name}").status_code, 404)
+
+    def test_the_button_always_shows_and_explains_an_installed_app(self):
+        script = b"".join(Client().get("/app/install.js").streaming_content).decode()
+        self.assertIn("button.hidden = false", script)
+        self.assertIn("getInstalledRelatedApps", script)
+        page = Client().get("/login/")
+        for steps in ("android", "chrome", "edge", "ios", "mac", "samsung", "firefox", "other"):
+            self.assertContains(page, f'data-install-for="{steps}"')
+        self.assertContains(page, "Already installed? Install it fresh")
+        self.assertContains(page, "data-install-done hidden")
 
     def test_guests_pages_are_not_the_staff_app(self):
         restaurant = make_restaurant()

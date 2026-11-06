@@ -93,7 +93,12 @@ account menu), **Get the app** on the website, or the button on the login page.
 It opens in its own window with the Mr Cafe icon, on Android, iPhone, Windows, Mac and Linux.
 
 - It needs **HTTPS** (step 6). On plain `http://` the button simply does not show.
-- Nothing to set in Nginx: `/manifest.webmanifest`, `/sw.js` and `/offline/` come from Django.
+- Nothing to set in Nginx: `/manifest.webmanifest`, `/sw.js`, `/offline/` and the app's
+  icons, script and styles (`/app/...`) come from Django, so the Install button works
+  right after `git pull` and a restart, even before `collectstatic`.
+- The button always shows in the browser. Where the browser has no install prompt (or
+  the app is already installed), it opens the steps for that browser and how to
+  install it fresh over the old one.
 - After each update `collectstatic` (step 4) is enough: open apps pick up the new
   version on their next start. Pages and orders are never stored on the device,
   only CSS, JS and icons.

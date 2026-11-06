@@ -160,7 +160,7 @@ class Command(BaseCommand):
         self.head("Pages")
         hosts = [host for host in settings.ALLOWED_HOSTS if host not in ("127.0.0.1", "localhost", "*")]
         browser = Client(HTTP_HOST=(hosts or ["localhost"])[0].lstrip("."))
-        for url in ("/", "/login/", "/manifest.webmanifest", "/sw.js", "/offline/"):
+        for url in ("/", "/login/", "/manifest.webmanifest", "/sw.js", "/offline/", "/app/install.js", "/app/icon-192.png"):
             try:
                 status = browser.get(url, secure=True).status_code
             except Exception as error:

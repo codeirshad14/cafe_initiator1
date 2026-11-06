@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static pwa_files %}<!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8">
@@ -40,7 +40,7 @@
                 <li><a class="site-link" href="#faq">FAQ</a></li>
             </ul>
             <div class="site-nav-actions">
-                {# install the restaurant app: shows only where this browser can (static/js/install.js) #}
+                {# install the restaurant app: always in the browser (static/js/install.js) #}
                 <button type="button" class="btn btn-light" data-install-app hidden><i class="bi bi-download" aria-hidden="true"></i> Get the app</button>
                 {% if current_staff %}
                 <a class="btn btn-primary" href="{% url 'core:home' %}"><i class="bi bi-speedometer2" aria-hidden="true"></i> Open {{ current_restaurant.name }}</a>
@@ -390,7 +390,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 <script src="{% static 'js/app.js' %}"></script>
-<script src="{% static 'js/install.js' %}"></script>
+<script src="{% app_file 'install.js' %}"></script>
 <script>
     // phone: close the menu after tapping a link in it
     document.querySelectorAll("#siteMenu a[href^='#']").forEach(function (link) {

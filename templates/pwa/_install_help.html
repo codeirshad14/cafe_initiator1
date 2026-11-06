@@ -1,15 +1,41 @@
-{% load static %}
-{# "Install app" where the browser has no install prompt (iPhone, iPad, Safari on a Mac): #}
-{# how to add it by hand. static/js/install.js opens it and shows the part for this device. #}
+{% load pwa_files %}
+{# "Install app" when the browser shows no install prompt of its own: the steps for this #}
+{# browser, and what to do when the app is already installed (static/js/install.js picks). #}
 <dialog class="install-help" id="installHelp" aria-labelledby="installHelpTitle">
     <div class="install-help-head">
-        <img src="{% static 'img/app/icon-192.png' %}" alt="" width="48" height="48">
+        <img src="{% app_file 'icon-192.png' %}" alt="" width="48" height="48">
         <div>
             <h2 id="installHelpTitle">Install {{ brand_name }}</h2>
-            <p>Open it from your home screen like any app.</p>
+            <p>Open it from your home screen or desktop like any app.</p>
         </div>
     </div>
 
+    {# shown when the browser says the app is already on this device #}
+    <p class="install-help-done" data-install-done hidden>
+        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+        <span><strong>{{ brand_name }} is already installed here.</strong> Open it from your home screen,
+        desktop, Start menu or Dock. It updates itself each time it opens: nothing to download again.</span>
+    </p>
+
+    <ol class="install-help-steps" data-install-for="android">
+        <li>Tap the menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i> at the top right of Chrome.</li>
+        <li>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</li>
+        <li>The {{ brand_name }} icon is now with your other apps.</li>
+    </ol>
+    <ol class="install-help-steps" data-install-for="samsung">
+        <li>Tap the menu <i class="bi bi-list" aria-hidden="true"></i> at the bottom of Samsung Internet.</li>
+        <li>Tap <strong>Add page to</strong>, then <strong>Home screen</strong>.</li>
+    </ol>
+    <ol class="install-help-steps" data-install-for="chrome">
+        <li>Click the install icon <i class="bi bi-display" aria-hidden="true"></i> at the right end of the address bar,</li>
+        <li>or open the menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i> → <strong>Cast, save and share</strong> → <strong>Install page</strong>.</li>
+        <li>Click <strong>Install</strong>. {{ brand_name }} opens in its own window, with an icon on the desktop.</li>
+    </ol>
+    <ol class="install-help-steps" data-install-for="edge">
+        <li>Click the install icon <i class="bi bi-plus-square" aria-hidden="true"></i> at the right end of the address bar,</li>
+        <li>or open the menu <i class="bi bi-three-dots" aria-hidden="true"></i> → <strong>Apps</strong> → <strong>Install this site as an app</strong>.</li>
+        <li>Click <strong>Install</strong>. {{ brand_name }} opens in its own window, with an icon on the desktop.</li>
+    </ol>
     <ol class="install-help-steps" data-install-for="ios">
         <li>Tap <strong>Share</strong> <i class="bi bi-box-arrow-up" aria-hidden="true"></i> in Safari's bar.</li>
         <li>Scroll down, tap <strong>Add to Home Screen</strong> <i class="bi bi-plus-square" aria-hidden="true"></i>.</li>
@@ -20,10 +46,24 @@
         <li>Choose <strong>Add to Dock</strong>, then <strong>Add</strong>.</li>
         <li>{{ brand_name }} opens from the Dock in its own window.</li>
     </ol>
-    <ol class="install-help-steps" data-install-for="other">
-        <li>Open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
-        <li>Open the browser menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>, choose <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</li>
+    <ol class="install-help-steps" data-install-for="firefox">
+        <li>On a phone: Firefox menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i> → <strong>Install</strong> (or <strong>Add to Home screen</strong>).</li>
+        <li>On a computer Firefox cannot install apps: open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> and press Install app there.</li>
     </ol>
+    <ol class="install-help-steps" data-install-for="other">
+        <li>Open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (Safari on iPhone).</li>
+        <li>Press <strong>Install app</strong> there, or use the browser menu's <strong>Install app</strong> / <strong>Add to Home screen</strong>.</li>
+    </ol>
+
+    {# "overwrite": a fresh install over the old one #}
+    <details class="install-help-again">
+        <summary>Already installed? Install it fresh</summary>
+        <ol>
+            <li>Remove the old one. Phone: press and hold the {{ brand_name }} icon → <strong>Uninstall</strong> / <strong>Remove</strong>.
+                Computer: open the app → menu <i class="bi bi-three-dots-vertical" aria-hidden="true"></i> → <strong>Uninstall {{ brand_name }}</strong>.</li>
+            <li>Come back to this page, press <strong>Ctrl+F5</strong> (phone: reload), then <strong>Install app</strong>.</li>
+        </ol>
+    </details>
 
     <form method="dialog">
         <button type="submit" class="btn btn-primary w-100">OK</button>

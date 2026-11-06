@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load static pwa_files %}<!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8">
@@ -84,7 +84,7 @@
         </form>
 
         <p class="auth-help">Forgot your password? Ask your restaurant admin to reset it from the Staff page.</p>
-        {# install the app on this phone / computer (static/js/install.js shows it where it can) #}
+        {# install the app on this phone / computer: always in the browser (static/js/install.js) #}
         <button type="button" class="btn btn-light w-100 auth-install" data-install-app hidden>
             <i class="bi bi-download" aria-hidden="true"></i> Install the {{ brand_name }} app on this device
         </button>
@@ -92,7 +92,7 @@
     </section>
 </main>
 {% include "pwa/_install_help.html" %}
-<script src="{% static 'js/install.js' %}"></script>
+<script src="{% app_file 'install.js' %}"></script>
 
 <script>
     // show / hide the password

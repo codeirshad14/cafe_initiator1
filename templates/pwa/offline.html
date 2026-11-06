@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+{% load pwa_files %}<!DOCTYPE html>
 {% comment %}
 No internet (pwa/views.py offline): the app shows this page instead of the browser's
 error. Kept on the device by the service worker, so everything it needs is in this
@@ -11,7 +11,7 @@ file (no fonts or CSS from the internet). It reloads by itself once the internet
     <meta name="theme-color" content="#da3831">
     <meta name="robots" content="noindex">
     <title>No internet · {{ brand_name }}</title>
-    <link rel="icon" href="{% static 'img/app/favicon-32.png' %}" sizes="32x32">
+    <link rel="icon" href="{% app_file 'favicon-32.png' %}" sizes="32x32">
     <style>
         :root { --red: #da3831; --ink: #1d1a17; --ink-2: #5b544d; --bg: #f7f5f2; }
         * { box-sizing: border-box; }
@@ -38,7 +38,7 @@ file (no fonts or CSS from the internet). It reloads by itself once the internet
 </head>
 <body>
 <main>
-    <img src="{% static 'img/app/icon-192.png' %}" alt="">
+    <img src="{% app_file 'icon-192.png' %}" alt="">
     <h1>No internet</h1>
     <p>Orders and bills need the internet. Check the Wi-Fi or mobile data, then try again.</p>
     <button type="button" onclick="location.reload()">Try again</button>

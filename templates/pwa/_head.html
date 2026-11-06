@@ -1,9 +1,11 @@
-{% load static %}
+{% load static pwa_files %}
 {# the installable app (pwa/views.py): staff pages, the login page and the website. Not the guests' pages. #}
+{# Its icons and styles come from /app/ (pwa/files.py), so they never wait for collectstatic. #}
 <link rel="manifest" href="{% url 'pwa:manifest' %}">
-<link rel="icon" href="{% static 'img/app/favicon-32.png' %}" sizes="32x32" type="image/png">
+<link rel="icon" href="{% app_file 'favicon-32.png' %}" sizes="32x32" type="image/png">
 <link rel="icon" href="{% static 'img/admin-logo.svg' %}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="{% static 'img/app/apple-touch-icon.png' %}">
+<link rel="apple-touch-icon" href="{% app_file 'apple-touch-icon.png' %}">
+<link rel="stylesheet" href="{% app_file 'install.css' %}">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
