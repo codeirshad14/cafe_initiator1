@@ -327,8 +327,8 @@ class MembershipTypeTests(TestCase):
 
     def test_django_admin_shows_the_type_and_use(self):
         from django.contrib.auth.models import User
-        developer = Client()
-        developer.force_login(User.objects.create_superuser("dev", email="dev@x.test", password="Dev@12345"))
+        from core.testing import developer_client
+        developer = developer_client()
         page = developer.get("/admin/core/restaurant/")
         self.assertContains(page, "Membership type")
         self.assertContains(page, "Bills this year")
@@ -342,8 +342,8 @@ class AdminRestaurantFormTests(TestCase):
     def setUp(self):
         from django.contrib.auth.models import User
         self.User = User
-        self.client = Client()
-        self.client.force_login(User.objects.create_superuser("dev", email="dev@x.test", password="Dev@12345"))
+        from core.testing import developer_client
+        self.client = developer_client()  # the Django admin keeps a login of its own (core/middleware.py)
         self.free = User.objects.create_user("free@x.test", email="free@x.test", password=PASSWORD)
         self.taken = make_staff(make_restaurant("Blue Bay"), "ADMIN").user  # already staff elsewhere
 
@@ -559,8 +559,8 @@ class SliderTests(TestCase):
 
     def test_django_admin_has_the_slider_uploads(self):
         from django.contrib.auth.models import User
-        developer = Client()
-        developer.force_login(User.objects.create_superuser("dev", email="dev@x.test", password="Dev@12345"))
+        from core.testing import developer_client
+        developer = developer_client()
         page = developer.get(f"/admin/core/restaurant/{self.restaurant.pk}/change/")
         self.assertContains(page, "Public menu slider")
         self.assertContains(page, 'name="slide_1"')
@@ -1176,3 +1176,55 @@ class BackButtonTests(TestCase):
             css = file.read()
         self.assertIn("@view-transition", css)  # smooth page changes
         self.assertIn("prefers-reduced-motion: reduce", css)
+
+
+class SeparateAdminLoginTests(TestCase):
+    """The developer's Django admin keeps a login of its own (core/middleware.py): signing in
+    to /admin/ as the superuser (e.g. during an update) never replaces the cafe's login in the
+    same browser, so the app never shows "This is the developer login"."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.restaurant = make_restaurant()
+        self.cashier = make_staff(self.restaurant, "CASHIER")
+        User.objects.create_superuser("cafeadmin", email="cafeadmin@x.test", password="Dev@12345")
+
+    def test_admin_login_leaves_the_cafe_login_alone(self):
+        browser = Client()
+        browser.post("/login/", {"username": self.cashier.user.email, "password": PASSWORD})
+        self.assertContains(browser.get("/floor/"), self.cashier.name)
+
+        signed_in = browser.post("/admin/login/?next=/admin/", {"username": "cafeadmin", "password": "Dev@12345"})
+        self.assertRedirects(signed_in, "/admin/", fetch_redirect_response=False)
+        self.assertEqual(browser.get("/admin/").status_code, 200)  # the developer is in the admin
+        floor = browser.get("/floor/")
+        self.assertEqual(floor.status_code, 200)  # and the cafe app is still the cashier's
+        self.assertContains(floor, self.cashier.name)
+        self.assertNotContains(floor, "developer login")
+        self.assertIn("mrcafe_admin_session", browser.cookies)
+
+        browser.post("/admin/logout/")  # leaving the admin
+        self.assertEqual(browser.get("/admin/").status_code, 302)  # admin: signed out
+        self.assertContains(browser.get("/floor/"), self.cashier.name)  # app: still signed in
+
+        browser.post("/logout/")  # leaving the app does not sign in or out anything else
+        self.assertEqual(browser.get("/floor/").status_code, 302)
+
+    def test_the_admin_login_page_lands_in_the_admin_not_the_app(self):
+        browser = Client()
+        browser.post("/login/", {"username": self.cashier.user.email, "password": PASSWORD})
+        # its form sends no "next": it used to open the app's Home ("This is the developer login")
+        signed_in = browser.post("/admin/login/", {"username": "cafeadmin", "password": "Dev@12345"})
+        self.assertRedirects(signed_in, "/admin/", fetch_redirect_response=False)
+        self.assertContains(browser.get("/home/", follow=True), self.cashier.name)  # the app: still the cashier
+
+    def test_app_login_leaves_the_admin_alone(self):
+        browser = Client()
+        browser.post("/admin/login/?next=/admin/", {"username": "cafeadmin", "password": "Dev@12345"})
+        browser.post("/login/", {"username": self.cashier.user.email, "password": PASSWORD})
+        self.assertEqual(browser.get("/admin/").status_code, 200)
+        self.assertContains(browser.get("/floor/"), self.cashier.name)
+
+    def test_the_staff_login_page_refuses_the_developer_account(self):
+        page = Client().post("/login/", {"username": "cafeadmin", "password": "Dev@12345"})
+        self.assertContains(page, "the developer&#x27;s login: it signs in at /admin/ only")

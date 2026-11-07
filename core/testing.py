@@ -36,6 +36,20 @@ def client_for(staff):
     return client
 
 
+def developer_client(user=None):
+    """A test browser signed in to the Django admin as the developer's superuser.
+    /admin/ keeps a login of its own (core/middleware.py), so it gets the admin's cookie."""
+    from django.conf import settings
+
+    from core.middleware import ADMIN_SESSION
+    if user is None:
+        user = User.objects.create_superuser("dev", email="dev@x.test", password="Dev@12345")
+    client = Client()
+    client.force_login(user)
+    client.cookies[ADMIN_SESSION] = client.cookies[settings.SESSION_COOKIE_NAME].value
+    return client
+
+
 def make_menu(restaurant):
     """One category with two dishes: (category, paneer at 249, naan at 60)."""
     category = Category.objects.create(restaurant=restaurant, name="Starters")

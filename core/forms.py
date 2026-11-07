@@ -75,6 +75,8 @@ class StaffLoginForm(AuthenticationForm):
         **AuthenticationForm.error_messages,
         "invalid_login": "Email and password did not match. Please try again.",
         "no_restaurant": "This login is not linked to any restaurant.",
+        "developer": "This is the developer's login: it signs in at /admin/ only. Restaurant staff sign in "
+                     "here with their own email.",
         "staff_off": "Your login has been switched off. Please ask your restaurant admin.",
         "restaurant_off": "This restaurant has been switched off. Please contact us.",
         "membership_ended": "Your restaurant's membership ended on %(ended)s. Please contact us to renew it.",
@@ -109,8 +111,8 @@ class StaffLoginForm(AuthenticationForm):
         staff = getattr(user, "staff", None)
 
         if staff is None:
-            if user.is_superuser:
-                return  # the platform owner: goes to the Django admin
+            if user.is_superuser:  # the developer: /admin/ only (it has a login of its own: core/middleware.py)
+                raise forms.ValidationError(self.error_messages["developer"], code="developer")
             raise forms.ValidationError(self.error_messages["no_restaurant"], code="no_restaurant")
 
         restaurant = staff.restaurant
