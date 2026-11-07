@@ -165,17 +165,36 @@ the backups off the server too, and back up `/srv/resto/media/` (menu photos).
 
 ## Updating to a new version
 
-One command, from the project folder, after every push:
+Once, from the project folder (first `git pull`, so the newest script runs):
 
 ```bash
+git pull
 sudo bash deploy/update.sh            # or: sudo bash deploy/update.sh cafe1
 ```
 
-It finds the service, its user and its Python by itself, then: `git pull`, packages,
-makes the folders the app writes (static, media, cache) belong to the app's user,
-`migrate`, `collectstatic`, restart, and `check_setup`. It ends with "Updated" or with
-the FAIL lines and their fixes. Never skip it for a plain `git pull` + restart: a new
-file without `collectstatic`, or a migration without `migrate`, is what broke pages before.
+It finds the service, its user and its Python by itself, then: packages, makes the
+folders the app writes (static, media, cache) belong to the app's user, `migrate`,
+`collectstatic`, restart, and `check_setup`. It ends with "Updated" or with the FAIL
+lines and their fixes.
+
+It also makes **every later update automatic**:
+
+- each start of the service first runs `migrate` and `collectstatic`
+  (`/etc/systemd/system/<service>.service.d/mrcafe-update.conf`), so a restart can never
+  leave new code on an old database, the cause of every error 500 after an update;
+- a `git pull` that brings new code restarts the service by itself (`.git/hooks/post-merge`).
+
+So after that one run, an update is just:
+
+```bash
+cd /home/irshad/django/cafe_initiator1 && git pull     # as root: it restarts the app itself
+```
+
+(As another user, the pull says to run `sudo systemctl restart <service>`, which does the rest.)
+
+(A restart now takes a little longer, while it migrates and collects: the site is back
+in under a minute. `sudo bash deploy/update.sh` can still be run any time; it shows
+each step and ends with the check.)
 
 ## When something is wrong
 
