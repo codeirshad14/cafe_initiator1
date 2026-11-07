@@ -10,7 +10,9 @@ Guest pages (no login). Staff screens are in staff_views.py and delivery_views.p
   cart_put / cart_add / cart_remove            HTMX: change the cart (kept in the session)
   cart_view          /m/<qr_token>/cart/       the cart, the order type, which bill, the details
   order_place        POST                      the cart becomes a KOT (services.place_kot)
-  order_track        /track/<token>/           the order's live status
+  call_waiter        POST /m/<qr_token>/call/  the guest's bell: the waiter comes to the table
+  order_track        /track/<token>/           the order's live status (and, once billed,
+                                               "Rate your visit": web.views.order_feedback)
   order_track_lookup /m/<qr_token>/track/      find a recent order by its number
 """
 
@@ -30,14 +32,16 @@ from core.models import Restaurant
 from core.utils import is_htmx
 from menu.models import MenuItem, MenuItemPortion
 from tables.models import common_table, tables_to_pick, takeaway_table
+from web.models import Feedback
 
 from .cart import (
     MAX_QTY, add_qty, cart_details, change_qty, clear_cart, dish_and_portion, item_cart_total, keep_orderable_only,
     menu_facts, menu_with_cart, read_cart, remove_line, with_counts,
 )
 from .decorators import with_customer_table
+from . import services
 from .forms import CustomerOrderForm, TrackLookupForm
-from .models import Order
+from .models import Notification, Order
 from .services import (
     OrderNotAllowed, bill_choice, delivery_steps, kot_steps, order_headline, order_to_join, order_total, place_kot,
 )
@@ -214,6 +218,7 @@ def render_menu(request, table):
         **menu_facts(categories),
         "cart": cart_details(request, table),
         "my_order": my_running_order(request, table),
+        "can_call": can_call_waiter(table),  # the bell: call the waiter to this table
     }
     if table.is_takeaway:
         types = public_order_types(table)
@@ -416,6 +421,30 @@ def order_place(request, table):
     return redirect(reverse("orders:order_track", args=[kot.order.public_token]) + "?placed=1")
 
 
+# ================================================================ the guest's bell
+
+def can_call_waiter(table):
+    """The bell is for a real dining table: staff know where to go. Not the counter
+    (parcels) nor the Common table (no place to walk to)."""
+    return not table.is_takeaway and not table.is_common
+
+
+@require_POST
+@with_customer_table
+def call_waiter(request, table):
+    """HTMX, the bell on the table's QR menu or order page: "Call waiter", "Water please"
+    or "Bring the bill". The Floor staff's bells ring once with the table's name."""
+    if not can_call_waiter(table):
+        return HttpResponse(status=404)
+    reason = request.POST.get("reason", "")
+    if reason not in Notification.Reason.values:
+        reason = Notification.Reason.CALL
+    call = services.call_waiter(table, reason, my_running_order(request, table))
+    return render(request, "orders/_call_waiter_done.html", {
+        "table": table, "called": call is not None, "reason": Notification.Reason(reason).label,
+    })
+
+
 # ================================================================ tracking
 
 def order_track(request, public_token):
@@ -429,6 +458,8 @@ def order_track(request, public_token):
     for kot in kots:
         kot.steps = kot_steps(kot)
     headline, headline_icon = order_headline(order, kots)
+    bill = order.current_bill()  # its own, or the one it was billed together on
+    bill = bill if bill and bill.status != "CANCELLED" else None
 
     context = {
         "order": order,
@@ -438,12 +469,19 @@ def order_track(request, public_token):
         "headline_icon": headline_icon,
         "total": order_total(kots),
         "delivery_steps": delivery_steps(order, kots) if order.is_delivery else None,
-        "bill": order.bill if hasattr(order, "bill") and order.bill.status != "CANCELLED" else None,
+        "bill": bill,
         # another round for the same table (a take-away parcel is one order, so not there)
         "can_order_more": (
             order.status == Order.Status.OPEN and not order.is_parcel and order.table is not None
             and order.table.is_active and order.restaurant.is_usable()
         ),
+        # the bell while the guests are still at their table
+        "call_table": order.table if (
+            order.is_running and not order.is_parcel and order.table is not None
+            and order.table.is_active and can_call_waiter(order.table)
+        ) else None,
+        # once the bill is made: "Rate your visit" (web.views.order_feedback), or their stars
+        "feedback": Feedback.objects.filter(order=order).first() if bill else None,
     }
     if is_htmx(request):
         return render(request, "orders/_track_status.html", context)

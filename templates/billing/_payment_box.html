@@ -42,7 +42,7 @@ data-balance: static/js/billing.js works out the change for cash live.
         <div class="paid-box">
             <span class="empty-icon empty-icon--ok"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
             <strong>Fully paid</strong>
-            <span>{% if bill.order.is_delivery %}The order is paid.{% if not bill.order.delivered_at %} The rider can still mark it delivered.{% endif %}{% elif bill.order.is_takeaway %}The parcel order is closed.{% else %}Order #{{ bill.order.order_no }} on table {{ bill.order.table|default:"" }} is closed.{% endif %}</span>
+            <span>{% if bill.order.is_delivery %}The order is paid.{% if not bill.order.delivered_at %} The rider can still mark it delivered.{% endif %}{% elif bill.order.is_takeaway %}The parcel order is closed.{% elif bill.joined_orders.exists %}Orders {{ bill.order_numbers }} ({{ bill.place_label }}) are closed.{% else %}Order #{{ bill.order.order_no }} on table {{ bill.order.table|default:"" }} is closed.{% endif %}</span>
             <div class="paid-actions">
                 <a class="btn btn-primary" href="{% url 'billing:bill_print' bill.pk %}" target="_blank" rel="noopener"
                    data-print="bill" data-print-slip="{% url 'billing:bill_print_slip' bill.pk %}" data-print-name="Bill #{{ bill.bill_no }}"><i class="bi bi-printer" aria-hidden="true"></i> Print bill</a>

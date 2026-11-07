@@ -29,10 +29,17 @@ only). Asks again every 15 seconds.
                 {% if o.cooking %}<span class="status-badge status-warning">{{ o.cooking }} cooking</span>{% endif %}
                 {% if o.ready %}<span class="status-badge status-info">{{ o.ready }} ready</span>{% endif %}
                 {% if not o.cooking and not o.ready %}<span class="status-badge status-success">All served</span>{% endif %}
+                {% if o.together_with %}<span class="status-badge status-brand">Same table as #{{ o.together_with }}</span>{% endif %}
             </div>
             <div class="to-bill-actions">
                 <a class="btn btn-sm btn-light" href="{% if o.is_parcel %}{% url 'orders:floor_order' o.pk %}{% else %}{% url 'orders:floor_table' o.table_id %}?order={{ o.pk }}{% endif %}">View</a>
-                {% if can_bill %}<a class="btn btn-sm btn-primary" href="{% url 'billing:bill_create' o.pk %}"><i class="bi bi-receipt" aria-hidden="true"></i> Make bill</a>{% endif %}
+                {% if can_bill %}
+                {% if o.together_url %}
+                {# the table's orders on one bill (billing.views.mark_bill_together) #}
+                <a class="btn btn-sm btn-primary to-bill-together" href="{{ o.together_url }}"><i class="bi bi-intersect" aria-hidden="true"></i> Bill together ({{ o.together_count }} orders)</a>
+                {% endif %}
+                <a class="btn btn-sm {% if o.together_url %}btn-light{% else %}btn-primary{% endif %}" href="{% url 'billing:bill_create' o.pk %}"><i class="bi bi-receipt" aria-hidden="true"></i> Make bill</a>
+                {% endif %}
             </div>
         </article>
         {% endfor %}

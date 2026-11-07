@@ -3,7 +3,7 @@
 
 {% block title %}Bill #{{ bill.bill_no }}{% endblock %}
 {% block crumbs %}<span>/</span>{% if back %}<a href="{% url 'reports:index' %}">Reports</a>{% else %}<a href="{% url 'billing:bill_list' %}">Bills</a>{% endif %}<span>/</span><span>Bill #{{ bill.bill_no }}</span>{% endblock %}
-{% block page_title %}Bill #{{ bill.bill_no }} · {{ bill.order.place_label }}{% endblock %}
+{% block page_title %}Bill #{{ bill.bill_no }} · {{ bill.place_label }}{% endblock %}
 
 {% block page_actions %}
 {% if back %}{# opened from a report's row (drill down) #}
@@ -38,6 +38,15 @@
         {% if can_bill %}<a href="{% url 'billing:bill_create' bill.order_id %}">generate the bill again</a>{% else %}the counter generates the bill again{% endif %} to update this bill.</span>
 </div>
 {% endif %}
+{% with together=bill.joined_orders.all %}{% if together %}
+{# billed together (billing.services.make_bill join): which orders and tables this one bill covers #}
+<div class="alert alert-info d-flex gap-2 align-items-start mb-0 together-alert" role="status">
+    <i class="bi bi-intersect" aria-hidden="true"></i>
+    <span>One bill for {{ together|length|add:1 }} orders:
+        {% for o in bill.all_orders %}<a href="{% url 'orders:floor_table' o.table_id %}?order={{ o.pk }}">#{{ o.order_no }} · {{ o.place_label }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        Paying it closes them all.</span>
+</div>
+{% endif %}{% endwith %}
 {% if bill.status == "CANCELLED" %}
 <div class="alert alert-danger d-flex gap-2 align-items-start mb-0" role="status">
     <i class="bi bi-x-octagon" aria-hidden="true"></i>
@@ -85,6 +94,33 @@
 
     <aside class="bill-side">
         {% include "billing/_payment_box.html" %}
+
+        {% if feedback_url %}
+        {# the guest's stars for this visit, or the "Rate your visit" link to send them (web/sharing.py) #}
+        <section class="panel feedback-box">
+            <div class="panel-head"><h2 class="panel-title"><i class="bi bi-star" aria-hidden="true"></i> Guest feedback</h2></div>
+            <div class="panel-body">
+                {% if feedback %}
+                <p class="rating-big"><strong>{{ feedback.rating }}</strong> <i class="bi bi-star-fill" aria-hidden="true"></i> <small>{{ feedback.created_at|date:"d M, h:i A" }}</small></p>
+                <ul class="rating-aspects">
+                    {% for label, icon, stars in feedback.aspects %}
+                    <li><span><i class="bi bi-{{ icon }}" aria-hidden="true"></i> {{ label }}</span><strong class="tnum">{{ stars }} <i class="bi bi-star-fill" aria-hidden="true"></i></strong></li>
+                    {% endfor %}
+                </ul>
+                {% if current_staff.works_everywhere %}<a class="btn btn-light btn-sm w-100 mt-2" href="{% url 'web:feedback_list' %}">All feedback</a>{% endif %}
+                {% else %}
+                <p class="form-hint">Not rated yet. Send the guest their bill with 3 star questions (food, staff, cafe).
+                    After a UPI payment the customer screen shows it as a QR code too.</p>
+                <div class="feedback-share">
+                    {% if feedback_whatsapp %}
+                    <a class="btn btn-success btn-sm" href="{{ feedback_whatsapp }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp" aria-hidden="true"></i> WhatsApp {{ bill.order.customer_phone }}</a>
+                    {% endif %}
+                    <button type="button" class="btn btn-light btn-sm" data-copy="{{ feedback_url }}"><i class="bi bi-link-45deg" aria-hidden="true"></i> Copy link</button>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
     </aside>
 </div>
 {% endblock %}

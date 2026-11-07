@@ -931,3 +931,91 @@ class NotificationTests(TestCase):
         note = Notification.objects.get()
         self.assertEqual(client_for(make_staff(other, "MANAGER")).post(f"/notifications/{note.pk}/open/").status_code, 404)
         self.assertEqual(Client().get("/notifications/").status_code, 302)  # not logged in: the login page
+
+
+class MoreRoundsOneBillTests(TestCase):
+    """A guest at a table orders, eats, then orders again (water): a new KOT on the same
+    order, so one bill for everything."""
+
+    def test_a_round_after_the_food_is_served_goes_on_the_same_bill(self):
+        from billing.models import Bill
+        restaurant = make_restaurant()
+        _, paneer, naan = make_menu(restaurant)
+        table = make_table(restaurant)
+        guest = Client()
+        guest_orders(guest, table, [paneer])
+        order = Order.objects.get()
+        waiter = client_for(make_staff(restaurant, "WAITER"))
+        kot = order.kots.get()
+        for status in ("PREPARING", "READY", "SERVED"):  # cooked and served
+            waiter.post(f"/kot/{kot.pk}/status/{status}/", {"screen": "kitchen"}, **HTMX)
+        self.assertEqual(KOT.objects.get(pk=kot.pk).status, "SERVED")
+
+        track = guest.get(f"/track/{order.public_token}/")
+        self.assertContains(track, "Order more")
+        guest_orders(guest, table, [naan])  # "water" after the meal
+
+        self.assertEqual(Order.objects.count(), 1)
+        self.assertEqual(order.kots.count(), 2)
+        client_for(make_staff(restaurant, "CASHIER")).post(f"/billing/create/{order.pk}/", {"discount_type": "AMOUNT"})
+        bill = Bill.objects.get()
+        self.assertEqual(sorted(bill.items.values_list("item_name", flat=True)), ["Butter Naan", "Paneer Tikka"])
+
+
+class WaiterCallTests(TestCase):
+    """The guest's bell on the table's QR menu: the Floor staff's bells ring once with the table."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant()
+        _, self.paneer, _ = make_menu(self.restaurant)
+        self.table = make_table(self.restaurant, "T4")
+        self.call_url = f"/m/{self.table.qr_token}/call/"
+        self.waiter = client_for(make_staff(self.restaurant, "WAITER"))
+
+    def test_the_bell_is_on_the_tables_menu_and_order_page(self):
+        guest = Client()
+        menu = guest.get(f"/m/{self.table.qr_token}/")
+        self.assertContains(menu, 'data-open-dialog="callWaiter"')
+        self.assertContains(menu, f'hx-post="{self.call_url}"')
+        for reason in ("Call waiter", "Water please", "Bring the bill"):
+            self.assertContains(menu, reason)
+        guest_orders(guest, self.table, [self.paneer])
+        track = guest.get(f"/track/{Order.objects.get().public_token}/")
+        self.assertContains(track, "Need anything? Call the waiter")
+        # the public menu (parcels) has no bell: no table to walk to
+        self.assertNotContains(Client().get(f"/r/{self.restaurant.slug}/"), 'data-open-dialog="callWaiter"')
+
+    def test_a_call_rings_once_for_the_floor_with_the_table(self):
+        from orders.models import Notification
+        guest = Client()
+        sent = guest.post(self.call_url, {"reason": "WATER"}, **HTMX)
+        self.assertContains(sent, "Water please: sent")
+        call = Notification.objects.get()
+        self.assertEqual((call.kind, call.table, call.reason, call.read_at), ("CALL", self.table, "WATER", None))
+
+        again = guest.post(self.call_url, {"reason": "CALL"}, **HTMX)  # pressed again at once: no second ring
+        self.assertContains(again, "already called")
+        self.assertEqual(Notification.objects.count(), 1)
+
+        bell = self.waiter.get("/notifications/")
+        self.assertContains(bell, "Table T4 is calling")
+        self.assertContains(bell, "Water please")
+        self.assertContains(bell, f'data-call-id="{call.pk}"')
+        self.assertContains(bell, 'data-call-text="Table T4: Water please"')
+        # the kitchen and riders do not get calls
+        kitchen_bell = client_for(make_staff(self.restaurant, "KITCHEN")).get("/notifications/")
+        self.assertNotContains(kitchen_bell, "is calling")
+        self.assertContains(kitchen_bell, 'data-call-id="0"')
+
+        opened = self.waiter.post(f"/notifications/{call.pk}/open/")
+        self.assertRedirects(opened, f"/floor/table/{self.table.pk}/", fetch_redirect_response=False)
+        self.assertIsNotNone(Notification.objects.get().read_at)
+        # answered: the table can call again
+        self.assertContains(guest.post(self.call_url, {"reason": "BILL"}, **HTMX), "Bring the bill: sent")
+        self.assertEqual(Notification.objects.filter(kind="CALL").count(), 2)
+
+    def test_not_from_the_counter_or_the_common_table(self):
+        from tables.models import common_table, takeaway_table
+        for table in (takeaway_table(self.restaurant), common_table(self.restaurant, self.table.location)):
+            with self.subTest(table=table.name):
+                self.assertEqual(Client().post(f"/m/{table.qr_token}/call/", **HTMX).status_code, 404)

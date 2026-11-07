@@ -51,7 +51,7 @@ The words come from Cafe profile > Website; a section with nothing to show is le
                 <li><a class="site-link" href="#about">About</a></li>
                 {% if categories %}<li><a class="site-link" href="#menu">Menu</a></li>{% endif %}
                 <li><a class="site-link" href="#visit">Visit us</a></li>
-                {% if reviews %}<li><a class="site-link" href="#reviews">Reviews</a></li>{% endif %}
+                {% if reviews or ratings %}<li><a class="site-link" href="#reviews">Reviews</a></li>{% endif %}
                 <li><a class="site-link" href="#contact">Contact</a></li>
             </ul>
             <div class="site-nav-actions">
@@ -231,22 +231,42 @@ The words come from Cafe profile > Website; a section with nothing to show is le
     </section>
 
     {# ============================================================ reviews #}
-    {% if reviews %}
+    {# the guests' average stars (Food, Staff, Cafe: Cafe profile > Website can hide them), then the reviews it picked #}
+    {% if reviews or ratings %}
     <section id="reviews" class="site-section site-section--tint">
         <div class="site-container">
             <div class="section-head">
                 <span class="eyebrow">Reviews</span>
                 <h2>What our guests say</h2>
             </div>
+            {% if ratings %}
+            <div class="cafe-ratings">
+                <div class="cafe-ratings-overall">
+                    <strong>{{ ratings.average }}</strong>
+                    <span class="cafe-stars cafe-stars--big" aria-label="{{ ratings.average }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= ratings.stars %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span>
+                    <small>from {{ ratings.count }} guest{{ ratings.count|pluralize }}</small>
+                </div>
+                {% for aspect in ratings.aspects %}
+                <div class="cafe-rating-row">
+                    <span class="cafe-rating-name"><i class="bi bi-{{ aspect.icon }}" aria-hidden="true"></i> {{ aspect.label }}</span>
+                    <span class="cafe-stars" aria-hidden="true">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= aspect.stars %}-fill{% endif %}"></i>{% endfor %}</span>
+                    <strong class="tnum">{{ aspect.average }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if reviews %}
             <div class="feature-grid">
                 {% for review in reviews %}
                 <figure class="feature-card cafe-review">
                     <span class="cafe-stars" aria-label="{{ review.rating }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= review.rating %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span>
-                    <blockquote>{{ review.message|truncatewords:60 }}</blockquote>
+                    {% if review.message %}<blockquote>{{ review.message|truncatewords:60 }}</blockquote>
+                    {% else %}<p class="cafe-review-aspects">{% for label, icon, stars in review.aspects %}<span>{{ label }} {{ stars }}<i class="bi bi-star-fill" aria-hidden="true"></i></span>{% endfor %}</p>{% endif %}
                     <figcaption>{{ review.name }} · {{ review.created_at|date:"M Y" }}</figcaption>
                 </figure>
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
     </section>
     {% endif %}

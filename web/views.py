@@ -5,7 +5,9 @@ The public websites and their settings.
   demo_request      POST /demo/                its "Book a free demo" form
   cafe_site         /cafe/<slug>/              a cafe's own one-page website: the same look, the
                                                cafe's name, story, menu, locations and contacts
-  cafe_feedback     POST /cafe/<slug>/feedback/  its feedback form (stars and a message)
+  cafe_feedback     POST /cafe/<slug>/feedback/  its feedback form (Food, Staff, Cafe stars, a message)
+  order_feedback    /feedback/<order token>/   "Rate your visit" after the bill: the guest's bill
+                                               and Food, Staff, Cafe stars (once per order)
   website_settings  /restaurant/website/       Cafe profile > Website: what that page says
   feedback_list     /restaurant/feedback/      Cafe profile > Feedback: what guests wrote
   feedback_show     POST .../<pk>/show/        show (or hide) one on the website
@@ -15,21 +17,24 @@ import time
 
 from django.conf import settings
 from django.contrib import messages
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from billing.models import Bill
 from core import roles
 from core.decorators import role_required
 from core.models import DEFAULT_MAX_USERS, Restaurant
 from core.pagination import paginate
 from core.utils import get_user_restaurant, is_htmx
 from orders.cart import menu_with_cart
+from orders.models import Order
 from tables.models import takeaway_table
 
-from .forms import CafeWebsiteForm, DemoRequestForm, FeedbackForm
-from .models import CafeWebsite
+from .forms import CafeWebsiteForm, DemoRequestForm, FeedbackForm, OrderFeedbackForm
+from .models import CafeWebsite, Feedback, rating_summary
 
 FEEDBACK_PER_HOUR = 3  # from one visitor (their session): more is kept out, with the same thank-you
 
@@ -123,6 +128,7 @@ def cafe_site(request, slug):
         "locations": list(restaurant.locations.filter(is_active=True)),
         "photos": photos,
         "reviews": list(restaurant.feedback.filter(show_on_site=True)[:6]),
+        "ratings": rating_summary(restaurant.feedback.all()) if website.show_ratings else None,
         "form": FeedbackForm(),
     })
 
@@ -155,6 +161,52 @@ def cafe_feedback(request, slug):
     return render(request, "web/_feedback_thanks.html", {"name": form.cleaned_data["name"], "restaurant": restaurant})
 
 
+# ================================================================ "Rate your visit" from the bill
+
+def feedback_bill(order):
+    """The order's bill the guest rates (its own, or the one it was billed together on),
+    while it is made and not cancelled; else None."""
+    bill = order.current_bill()  # no bill yet: None
+    return bill if bill is not None and bill.status != Bill.Status.CANCELLED else None
+
+
+def order_feedback(request, public_token):
+    """/feedback/<order's token>/: the guest's own bill (to look back at) and three questions,
+    Food, Staff and Cafe, 1 to 5 stars each. Once per order; after that it thanks them and
+    shows their stars. Reached from the order's status page, the customer screen after
+    paying, or the link staff send (Bills > a bill > Ask for feedback)."""
+    order = get_object_or_404(Order.objects.select_related("restaurant", "table"), public_token=public_token)
+    restaurant = order.restaurant
+    bill = feedback_bill(order)
+    given = Feedback.objects.filter(order=order).first()
+    form = OrderFeedbackForm(request.POST or None)
+
+    if request.method == "POST" and bill and not given and form.is_valid():
+        given = Feedback(
+            restaurant=restaurant, order=order,
+            name=order.customer_name or "Guest", phone=order.customer_phone, **form.cleaned_data,
+        )
+        given.set_overall()
+        try:
+            with transaction.atomic():
+                given.save()
+        except IntegrityError:  # sent twice at the same moment: the first one counts
+            given = Feedback.objects.get(order=order)
+        return redirect("web:order_feedback", public_token=order.public_token)
+
+    return render(request, "web/order_feedback.html", {
+        "order": order,
+        "restaurant": restaurant,
+        "subtitle": f"{restaurant.name} · Bill #{bill.bill_no}" if bill else restaurant.name,
+        "bill": bill,
+        "items": bill.items.all() if bill else [],
+        "payments": bill.payments.all() if bill else [],
+        "given": given,
+        "form": form,
+        "website_on": getattr(restaurant, "website", None) is None or restaurant.website.is_on,
+    })
+
+
 # ================================================================ Cafe profile > Website, Feedback
 
 @role_required(*roles.COMPANY)
@@ -177,9 +229,10 @@ def website_settings(request):
 
 @role_required(*roles.COMPANY)
 def feedback_list(request):
-    """What guests wrote on the cafe's website, newest first; opening the page reads them."""
+    """Guests' feedback (after the bill, and from the website), newest first; opening the
+    page reads them. The side shows the average stars, also for Food, Staff and Cafe."""
     restaurant = get_user_restaurant(request)
-    every = restaurant.feedback.all()
+    every = restaurant.feedback.select_related("order__bill")
     page, pager = paginate(every, request.GET)
     page = list(page)
     unread = {item.pk for item in page if not item.is_read}
@@ -197,6 +250,7 @@ def feedback_list(request):
         "total": total,
         "average": round(sum(n * c for n, c in counts.items()) / total, 1) if total else None,
         "bars": [{"stars": n, "count": c, "share": round(c * 100 / total) if total else 0} for n, c in counts.items()],
+        "summary": rating_summary(every) if total else None,
     })
 
 

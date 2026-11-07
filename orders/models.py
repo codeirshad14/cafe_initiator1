@@ -61,6 +61,11 @@ class Order(models.Model):
     order_type = models.CharField(max_length=10, choices=OrderType.choices, default=OrderType.DINE_IN)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
     cancel_reason = models.CharField(max_length=255, blank=True)
+    # "Bill together" (billing.services.make_bill): this order is paid on another order's bill,
+    # e.g. friends at one table who ordered separately, or a big family on two tables. It keeps
+    # its own table and KOTs; it is BILLED and CLOSED with that bill.
+    joined_bill = models.ForeignKey("billing.Bill", on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name="joined_orders")
     created_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
@@ -77,6 +82,10 @@ class Order(models.Model):
         if not self.location_id:  # where it is eaten or packed: its table's location
             self.location = self.table.location if self.table_id else self.restaurant.main_location()
         super().save(*args, **kwargs)
+
+    def current_bill(self):
+        """The bill this order is paid on: its own, or the one it was billed together on; None before."""
+        return getattr(self, "bill", None) or self.joined_bill  # (no bill of its own: None, not an error)
 
     @property
     def is_takeaway(self):
@@ -206,16 +215,33 @@ class KOTItem(models.Model):
 
 
 class Notification(models.Model):
-    """ "New order" in the bell of the top bar (orders/notification_views.py), for everyone
-    working at the order's location. It is made with the order (services.place_kot).
+    """A line in the bell of the top bar (orders/notification_views.py), for everyone
+    working at its location:
+
+      NEW_ORDER  "New order": made with the order (services.place_kot)
+      CALL       a guest at a table pressed the bell on their QR menu ("Call waiter",
+                 "Water please", "Bring the bill"): services.call_waiter. Only the
+                 Floor roles see it, with a soft sound once.
 
     Read once means read for all: when one person opens it (or Mark all as read),
-    the order has been seen to, so it leaves every bell.
+    it has been seen to, so it leaves every bell.
     """
+
+    class Kind(models.TextChoices):
+        NEW_ORDER = "NEW_ORDER", "New order"
+        CALL = "CALL", "Waiter call"
+
+    class Reason(models.TextChoices):  # what a guest's call is for
+        CALL = "CALL", "Call waiter"
+        WATER = "WATER", "Water please"
+        BILL = "BILL", "Bring the bill"
 
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name="notifications")
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name="notifications")
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="notifications")
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.NEW_ORDER)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, blank=True, related_name="notifications")
+    table = models.ForeignKey(DiningTable, on_delete=models.CASCADE, null=True, blank=True, related_name="calls")
+    reason = models.CharField(max_length=10, choices=Reason.choices, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True)
     read_by = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
@@ -225,4 +251,10 @@ class Notification(models.Model):
         indexes = [models.Index(fields=["location", "read_at"], name="notification_unread")]
 
     def __str__(self):
+        if self.is_call:
+            return f"{self.table.label}: {self.get_reason_display()}"
         return f"New order #{self.order.order_no}"
+
+    @property
+    def is_call(self):
+        return self.kind == self.Kind.CALL

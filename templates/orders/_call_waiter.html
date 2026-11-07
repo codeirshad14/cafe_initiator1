@@ -1,0 +1,32 @@
+{% comment %}
+The guest's bell (orders.guest_views.call_waiter): opened by any button with
+data-open-dialog="callWaiter" on the table's menu or order page. One tap sends the
+call; the Floor staff's bells ring once with the table's name. Needs: call_table.
+{% endcomment %}
+<dialog class="call-sheet" id="callWaiter" aria-labelledby="callWaiterTitle">
+    <div class="call-sheet-head">
+        <span class="call-sheet-bell" aria-hidden="true"><i class="bi bi-bell-fill"></i></span>
+        <div>
+            <h2 id="callWaiterTitle">Call the waiter</h2>
+            <p>To {{ call_table.label }}. What do you need?</p>
+        </div>
+    </div>
+    {# data-reset-on-close: the three choices come back when the sheet is closed (static/js/app.js) #}
+    <div id="callWaiterBody" data-reset-on-close>
+        <form class="call-sheet-options" hx-post="{% url 'orders:call_waiter' call_table.qr_token %}"
+              hx-target="#callWaiterBody" hx-disabled-elt="find button">
+            <button type="submit" name="reason" value="CALL" class="call-option">
+                <i class="bi bi-person-raised-hand" aria-hidden="true"></i><span>Call waiter</span>
+            </button>
+            <button type="submit" name="reason" value="WATER" class="call-option">
+                <i class="bi bi-cup-straw" aria-hidden="true"></i><span>Water please</span>
+            </button>
+            <button type="submit" name="reason" value="BILL" class="call-option">
+                <i class="bi bi-receipt" aria-hidden="true"></i><span>Bring the bill</span>
+            </button>
+        </form>
+    </div>
+    <form method="dialog">
+        <button type="submit" class="btn btn-light w-100">Close</button>
+    </form>
+</dialog>

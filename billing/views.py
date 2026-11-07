@@ -18,13 +18,15 @@ from orders.models import KOT, Order
 from orders.services import order_total
 from orders.staff_views import render_pos
 from tables.models import takeaway_table
+from web.sharing import feedback_context, feedback_qr
 
 from .forms import BillCancelForm, BillFilterForm, DiscountForm, PaymentForm
 from .models import Bill, Payment
 from .printing import bill_slip
 from .upi import bill_upi_data_uri, bill_upi_png, prints_amount_qr
 from .services import (
-    BillingError, add_payments, cancel_bill, make_bill, offer_for, preview_totals, remove_payment, reopen_order,
+    BillingError, add_payments, cancel_bill, joinable_orders, make_bill, offer_for, preview_totals, remove_payment,
+    reopen_order,
 )
 
 BILLING_ROLES = roles.BILLING
@@ -58,22 +60,30 @@ def bill_create(request, order_id):
     """Preview the bill of an open order, type a discount, then confirm to make the bill.
 
     A festival offer running today (Cafe profile > Offers) is filled in as the
-    discount; the cashier may change it. While the discount is typed, HTMX asks
-    this same view (GET) for the totals only.
+    discount; the cashier may change it. "Bill together": tick other open dine-in
+    orders (the same people's second order at this table, a big family's other table)
+    to put them on this one bill (?join=12&join=13 ticks them when the page opens).
+    While the discount is typed or an order ticked, HTMX asks this same view (GET)
+    for the totals (and the dishes) only.
     """
     restaurant = get_user_restaurant(request)
     order = get_object_or_404(Order.objects.select_related("table", "restaurant"), pk=order_id,
                               location=get_user_location(request))
 
-    if order.status == Order.Status.BILLED and hasattr(order, "bill"):
-        return redirect("billing:bill_detail", pk=order.bill.pk)
+    if order.status == Order.Status.BILLED and order.current_bill():
+        return redirect("billing:bill_detail", pk=order.current_bill().pk)
     if order.status != Order.Status.OPEN:
         messages.warning(request, f"Order #{order.order_no} is {order.get_status_display().lower()}.")
         return redirect("orders:floor")
 
-    food_total = preview_totals(order, "AMOUNT", 0)[1]["subtotal"]
+    data = request.POST if request.method == "POST" else request.GET
+    candidates = together_candidates(order)
+    wanted = set(data.getlist("join"))
+    joined = [other for other in candidates if str(other.pk) in wanted]
+
+    food_total = preview_totals(order, "AMOUNT", 0, joined)[1]["subtotal"]
     offer = offer_for(restaurant, timezone.localdate(), food_total)
-    form = DiscountForm(request.POST or request.GET or None,
+    form = DiscountForm(data if "discount_type" in data else None,
                         initial={"discount_type": offer.kind, "discount_value": offer.value} if offer else None)
     if form.is_bound:
         discount_type, discount_value = form.discount()
@@ -87,22 +97,40 @@ def bill_create(request, order_id):
     if request.method == "POST" and form.is_valid():
         try:
             bill = make_bill(order, request.user.staff, discount_type, discount_value,
-                             offer_name=offer.name if offer_kept else "")
+                             offer_name=offer.name if offer_kept else "", join=joined)
         except BillingError as error:
             messages.error(request, str(error))
             return redirect("orders:floor_table", table_id=order.table_id)
-        messages.success(request, f"Bill #{bill.bill_no} made for {inr(bill.grand_total)}.")
+        together = f" with {len(joined)} more order{'s' if len(joined) > 1 else ''}" if joined else ""
+        messages.success(request, f"Bill #{bill.bill_no} made for {inr(bill.grand_total)}{together}.")
         return redirect("billing:bill_detail", pk=bill.pk)
 
-    lines, totals = preview_totals(order, discount_type, discount_value)
+    lines, totals = preview_totals(order, discount_type, discount_value, joined)
     context = {"order": order, "lines": lines, "totals": totals, "form": form, "restaurant": restaurant,
-               "offer": offer, "offer_kept": offer_kept}
+               "offer": offer, "offer_kept": offer_kept, "candidates": candidates, "joined": joined,
+               "other_tables": sum(1 for other in candidates if not other.same_table),
+               "other_ticked": any(not other.same_table for other in joined)}
     if is_htmx(request) and request.method == "GET":
-        return render(request, "billing/_bill_totals.html", context)
+        return render(request, "billing/_bill_preview.html", context)  # totals, and the dishes out of band
 
-    context["unserved"] = order.kots.filter(status__in=[KOT.Status.NEW, KOT.Status.PREPARING, KOT.Status.READY]).count()
+    all_orders = [order, *joined]
+    context["unserved"] = KOT.objects.filter(
+        order__in=all_orders, status__in=[KOT.Status.NEW, KOT.Status.PREPARING, KOT.Status.READY]).count()
     context["redo"] = hasattr(order, "bill")
     return render(request, "billing/bill_create.html", context)
+
+
+def together_candidates(order):
+    """The orders that may go on this order's bill, each with its amount so far and rounds,
+    this table's first (billing.services.joinable_orders). Empty ones are left out."""
+    candidates = []
+    for other in joinable_orders(order).prefetch_related("kots__items"):
+        kots = [kot for kot in other.kots.all() if kot.status != KOT.Status.CANCELLED]
+        other.amount = order_total(kots)
+        if other.amount:
+            other.same_table = other.table_id == order.table_id
+            candidates.append(other)
+    return sorted(candidates, key=lambda other: not other.same_table)  # stable: this table first
 
 
 # ================================================================ one bill + payments
@@ -146,6 +174,8 @@ def bill_detail(request, pk):
         "can_cancel": role in roles.CANCEL and bill.status in (Bill.Status.UNPAID, Bill.Status.PARTIAL),
         "reopened": bill.status == Bill.Status.UNPAID and bill.order.status == Order.Status.OPEN,
     })
+    if bill.status != Bill.Status.CANCELLED:  # "Guest feedback": the stars, or the link to send
+        context.update(feedback_context(request, bill))
     return render(request, "billing/bill_detail.html", context)
 
 
@@ -225,7 +255,10 @@ def bill_upi_screen(request, pk):
     says "Payment received. Thank you!"."""
     bill = get_bill(request, pk)
     template = "billing/_upi_screen_body.html" if is_htmx(request) else "billing/upi_screen.html"
-    return render(request, template, upi_context(bill))
+    context = upi_context(bill)
+    if context["paid"]:  # "Payment received": then a QR code to rate the visit
+        context["feedback_qr"] = feedback_qr(request, bill.order)
+    return render(request, template, context)
 
 
 @require_POST
@@ -347,7 +380,26 @@ def orders_to_bill(location):
         order.cooking = sum(1 for kot in kots if kot.status in (KOT.Status.NEW, KOT.Status.PREPARING))
         order.ready = sum(1 for kot in kots if kot.status == KOT.Status.READY)
         orders.append(order)
+    mark_bill_together(orders)
     return orders
+
+
+def mark_bill_together(orders):
+    """A table with two or more orders waiting (the same people ordered again): its first
+    card gets "Bill together" (all of them on one bill), the others say whose bill to use."""
+    by_table = {}
+    for order in orders:
+        if order.order_type == Order.OrderType.DINE_IN and order.table_id and not order.table.is_takeaway:
+            by_table.setdefault(order.table_id, []).append(order)
+    for group in by_table.values():
+        if len(group) < 2:
+            continue
+        first, *others = group
+        first.together_count = len(group)
+        first.together_url = reverse("billing:bill_create", args=[first.pk]) + "?" + "&".join(
+            f"join={other.pk}" for other in others)
+        for other in others:
+            other.together_with = first.order_no
 
 
 def to_bill_context(request):
@@ -369,7 +421,7 @@ def filtered_bills(request):
     date_from, date_to = form.dates()
     bills = Bill.objects.filter(
         location=get_user_location(request), bill_date__range=(date_from, date_to),
-    ).select_related("order__table")
+    ).select_related("order__table").prefetch_related("joined_orders__table")  # "Tables T1 + T2"
 
     if form.is_valid():
         if form.cleaned_data["status"]:

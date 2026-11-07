@@ -34,6 +34,12 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
                     {% endif %}
                 </div>
             </div>
+            {% if at_table and can_call %}
+            {# the guest's bell: call the waiter to this table (orders/_call_waiter.html) #}
+            <button type="button" class="gm-bell" data-open-dialog="callWaiter" aria-haspopup="dialog" aria-label="Call the waiter">
+                <i class="bi bi-bell-fill" aria-hidden="true"></i>
+            </button>
+            {% endif %}
             {% if my_order %}
             <a class="gm-pill gm-pill--live" href="{% url 'orders:order_track' my_order.public_token %}">
                 <span class="live-dot" aria-hidden="true"></span> Order #{{ my_order.order_no }}
@@ -59,7 +65,7 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
                     <span class="gm-banner-kicker">{% if at_table %}Welcome to {{ table.label }}{% elif ordering %}Dine in, take away{% if restaurant.delivery_enabled %} or delivery{% endif %}{% else %}Our menu{% endif %}</span>
                     <h1>{{ restaurant.name }}</h1>
                     {% if at_table %}
-                    <p>Pick your dishes and order from your phone. It goes straight to the kitchen.</p>
+                    <p>Pick your dishes and order from your phone. It goes straight to the kitchen.{% if can_call %} Need anything? Tap <i class="bi bi-bell-fill" aria-hidden="true"></i><span class="visually-hidden">the bell</span> to call the waiter.{% endif %}</p>
                     {% elif restaurant.address %}
                     <p><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ restaurant.address|linebreaksbr }}</p>
                     {% endif %}
@@ -129,6 +135,7 @@ Needs: restaurant, categories, featured, dish_count, has_non_veg, ordering,
 
 {% block bottom %}
 {% if ordering %}{% include "orders/_cart_bar.html" %}{% endif %}
+{% if at_table and can_call %}{% include "orders/_call_waiter.html" with call_table=table %}{% endif %}
 {% endblock %}
 
 {% block extra_js %}

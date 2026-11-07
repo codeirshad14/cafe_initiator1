@@ -3,7 +3,7 @@ from django import forms
 from core.forms import add_bootstrap_classes
 from core.utils import clean_indian_mobile
 
-from .models import HIGHLIGHTS, CafeWebsite, DemoRequest, Feedback
+from .models import ASPECTS, HIGHLIGHTS, CafeWebsite, DemoRequest, Feedback
 
 
 class DemoRequestForm(forms.ModelForm):
@@ -53,7 +53,8 @@ class CafeWebsiteForm(forms.ModelForm):
 
     class Meta:
         model = CafeWebsite
-        fields = ["is_on", "tagline", "about", "cover", "opening_hours", "whatsapp", "instagram", "facebook"]
+        fields = ["is_on", "tagline", "about", "cover", "opening_hours", "whatsapp", "instagram", "facebook",
+                  "show_ratings"]
         widgets = {
             "tagline": forms.TextInput(attrs={"placeholder": "e.g. Wood-fired pizzas and the best cold coffee in town"}),
             "about": forms.Textarea(attrs={"rows": 5, "placeholder": "Since 2015 we have been serving…"}),
@@ -85,18 +86,40 @@ class CafeWebsiteForm(forms.ModelForm):
         return website
 
 
-class FeedbackForm(forms.ModelForm):
-    """The feedback form on a cafe's website: stars, a message, a name, the mobile if they like.
-    `website` is the same robot trap as on the demo form."""
+STAR_CHOICES = [(n, f"{n} star{'s' if n > 1 else ''}") for n in range(5, 0, -1)]  # 5 … 1: drawn right to left
 
-    rating = forms.TypedChoiceField(coerce=int, choices=[(n, f"{n} star{'s' if n > 1 else ''}") for n in range(5, 0, -1)],
-                                    widget=forms.RadioSelect, error_messages={"required": "Please pick the stars."})
+
+def star_field(label):
+    return forms.TypedChoiceField(label=label, coerce=int, choices=STAR_CHOICES, widget=forms.RadioSelect,
+                                  error_messages={"required": f"Please pick the stars for {label.lower()}."})
+
+
+class StarQuestions(forms.Form):
+    """The three questions, 1 to 5 stars each: Food, Staff, Cafe (web.models.ASPECTS)."""
+
+    food_rating = star_field("Food")
+    staff_rating = star_field("Staff")
+    cafe_rating = star_field("Cafe")
+
+    def star_questions(self):
+        """The three fields with their icons, for the template's star pickers."""
+        return [(self[field], icon) for field, _, icon in ASPECTS]
+
+
+class OrderFeedbackForm(StarQuestions):
+    """"Rate your visit" from the bill's link: the three questions, stars only."""
+
+
+class FeedbackForm(StarQuestions, forms.ModelForm):
+    """The feedback form on a cafe's website: the three questions, a message if they like,
+    a name, the mobile if they want a call back. `website` is the same robot trap as on the demo form."""
+
     website = forms.CharField(required=False, widget=forms.TextInput(attrs={"tabindex": "-1", "autocomplete": "off"}))
 
     class Meta:
         model = Feedback
-        fields = ["rating", "message", "name", "phone"]
-        labels = {"phone": "Mobile number (optional)"}
+        fields = ["food_rating", "staff_rating", "cafe_rating", "message", "name", "phone"]
+        labels = {"message": "Your feedback (optional)", "phone": "Mobile number (optional)"}
         widgets = {
             "message": forms.Textarea(attrs={"rows": 3, "placeholder": "What did you like? What can we do better?"}),
             "name": forms.TextInput(attrs={"autocomplete": "name", "placeholder": "Your name"}),
@@ -109,3 +132,10 @@ class FeedbackForm(forms.ModelForm):
 
     def clean_phone(self):
         return clean_indian_mobile(self.cleaned_data["phone"])
+
+    def save(self, commit=True):
+        feedback = super().save(commit=False)
+        feedback.set_overall()
+        if commit:
+            feedback.save()
+        return feedback

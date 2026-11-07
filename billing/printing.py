@@ -38,10 +38,10 @@ def bill_slip(bill):
     slip.rule()
 
     slip.row(f"Bill No: {bill.bill_no}", f"{bill.bill_date:%d-%m-%Y}")
-    slip.row(order.print_label, f"{timezone.localtime(bill.created_at):%I:%M %p}")
+    slip.row(bill.print_label, f"{timezone.localtime(bill.created_at):%I:%M %p}")
     if order.is_parcel and order.customer_phone:
         slip.row("Mobile", order.customer_phone)
-    slip.row(f"Order: #{order.order_no}", order.customer_name[:16])
+    slip.row(f"Order: {bill.order_numbers}", order.customer_name[:16])
     if order.customer_address:
         slip.text(f"Address: {order.customer_address}")
     if order.is_delivery and order.rider:

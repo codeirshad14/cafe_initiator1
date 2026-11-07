@@ -24,6 +24,7 @@ urlpatterns = [
     path("m/<uuid:qr_token>/cart/remove/<int:item_id>/", guest_views.cart_remove, name="cart_remove"),
     path("m/<uuid:qr_token>/place/", guest_views.order_place, name="order_place"),
     path("m/<uuid:qr_token>/track/", guest_views.order_track_lookup, name="order_track_lookup"),
+    path("m/<uuid:qr_token>/call/", guest_views.call_waiter, name="call_waiter"),
     path("track/<uuid:public_token>/", guest_views.order_track, name="order_track"),
 
     # staff: floor and tables

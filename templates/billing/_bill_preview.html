@@ -1,0 +1,3 @@
+{# HTMX answer while the discount is typed or an order ticked (billing.views.bill_create): the totals, and the dishes out of band #}
+{% include "billing/_bill_totals.html" %}
+{% include "billing/_bill_lines.html" with oob=True %}

@@ -15,6 +15,11 @@
    9. Booking: "How long" buttons fill "Until"          data-length="30" / "day"
   10. Live screens: another screen's change reloads     <body data-live-url>, hx-trigger="liveChanged from:body"
       the live blocks here at once
+  11. A guest's call (their table's bell): a soft      #notifyBell data-call-id / data-call-text
+      sound once, a message, and a pop-up on the
+      device when the app is in the background
+  12. Sheets: a button opens a <dialog>; its part      data-open-dialog="id", data-reset-on-close
+      comes back as it was when closed
 
 
    The server talks to this file through the HX-Trigger header, e.g.
@@ -255,19 +260,35 @@
   // number (core/live.py). When it moved, someone somewhere changed an order,
   // KOT, bill, payment or booking: fire "liveChanged" on <body>, and every live
   // block with hx-trigger="... liveChanged from:body" reloads itself.
+  // In the background (another tab, the app minimised) it only keeps asking when this
+  // device pops up waiter calls (part 11), and then only the bell looks again
+  // ("bellCheck"); the rest of the page catches up the moment it is back in view.
+  function popUpsOn() {
+    return "Notification" in window && Notification.permission === "granted";
+  }
+
   const liveUrl = document.body.dataset.liveUrl;
   if (liveUrl) {
     let liveVersion = null;
+    let bellVersion = null;
     const checkLive = function () {
-      if (document.hidden) return;
+      const background = document.hidden;
+      if (background && !popUpsOn()) return;
       fetch(liveUrl, { credentials: "same-origin" })
         .then(function (response) { return response.ok ? response.json() : null; })
         .then(function (answer) {
           if (!answer) return;
+          if (background) {
+            if (bellVersion !== null && answer.v !== bellVersion) {
+              document.body.dispatchEvent(new CustomEvent("bellCheck"));
+            }
+            bellVersion = answer.v;
+            return;
+          }
           if (liveVersion !== null && answer.v !== liveVersion) {
             document.body.dispatchEvent(new CustomEvent("liveChanged"));
           }
-          liveVersion = answer.v;
+          liveVersion = bellVersion = answer.v;
         })
         .catch(function () {});  // offline for a moment: the next check catches up
     };
@@ -275,5 +296,128 @@
     setInterval(checkLive, 3000);
     document.addEventListener("visibilitychange", checkLive);  // back on this tab: at once
   }
+
+  /* -------------------------------------------- 11. a guest's call */
+  // The bell (orders/_notification_bell.html) carries its newest unread call. A call
+  // this device has not rung for yet: a soft two-note chime once, a message with the
+  // table, and (installed app or browser in the background) a pop-up on the device.
+  // The number rung last is kept on the device, so every other tab stays quiet.
+  const HEARD_KEY = "resto-call-heard";
+  let audio = null;
+  let heardHere = 0;  // when the device's storage is off
+
+  function wakeSound() {
+    // browsers allow sound only after a tap on the page: get it ready at the first one
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+    } catch (e) {}
+  }
+  ["pointerdown", "keydown"].forEach(function (type) {
+    document.addEventListener(type, wakeSound, { passive: true });
+  });
+
+  function chime() {
+    wakeSound();
+    if (!audio) return;
+    try {
+      [0, 0.22].forEach(function (start, index) {  // two soft notes, like the kitchen's
+        const tone = audio.createOscillator();
+        const volume = audio.createGain();
+        tone.frequency.value = index ? 1046 : 784;
+        volume.gain.setValueAtTime(0.18, audio.currentTime + start);
+        volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + start + 0.25);
+        tone.connect(volume).connect(audio.destination);
+        tone.start(audio.currentTime + start);
+        tone.stop(audio.currentTime + start + 0.25);
+      });
+    } catch (e) {}
+  }
+
+  function lastHeard() {
+    try {
+      return parseInt(localStorage.getItem(HEARD_KEY) || "0", 10) || 0;
+    } catch (e) {
+      return heardHere;
+    }
+  }
+
+  function rememberHeard(id) {
+    heardHere = id;
+    try { localStorage.setItem(HEARD_KEY, String(id)); } catch (e) {}
+  }
+
+  function popUp(text) {
+    if (!popUpsOn() || !(document.hidden || !document.hasFocus())) return;
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function (registration) {
+      if (!registration) return;
+      registration.showNotification(text, {
+        body: "A guest is calling. Tap to open.",
+        icon: "/app/icon-192.png",
+        badge: "/app/favicon-32.png",
+        tag: "waiter-call",
+        renotify: true,
+        data: { url: "/floor/" },
+      });
+    }).catch(function () {});
+  }
+
+  function checkCall() {
+    const bell = document.getElementById("notifyBell");
+    const id = bell ? parseInt(bell.dataset.callId || "0", 10) || 0 : 0;
+    if (!id || id <= lastHeard()) return;
+    rememberHeard(id);
+    const text = bell.dataset.callText || "A table is calling";
+    chime();
+    showMessage(text, "warning");
+    popUp(text);
+  }
+
+  // "Pop up waiter calls on this device": asks the browser once (the app's bell list)
+  function showAlertsButton() {
+    const can = "Notification" in window && "serviceWorker" in navigator && window.isSecureContext &&
+      Notification.permission === "default";
+    document.querySelectorAll("[data-alerts-on]").forEach(function (button) { button.hidden = !can; });
+  }
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest("[data-alerts-on]")) return;
+    Notification.requestPermission().then(function (answer) {
+      showAlertsButton();
+      if (answer === "granted") showMessage("Waiter calls will pop up on this device.", "success");
+    });
+  });
+
+  document.body.addEventListener("htmx:afterSettle", function () {
+    checkCall();
+    showAlertsButton();
+  });
+
+  /* ------------------------------------------------------------ 12. sheets */
+  // <button data-open-dialog="callWaiter"> opens <dialog id="callWaiter">; a tap on the
+  // dim backdrop closes it. Inside, a part with data-reset-on-close is put back as it
+  // was when the sheet closes (the guest's bell: the three choices again).
+  document.addEventListener("click", function (event) {
+    const opener = event.target.closest("[data-open-dialog]");
+    if (opener) {
+      const sheet = document.getElementById(opener.dataset.openDialog);
+      if (sheet && typeof sheet.showModal === "function") sheet.showModal();
+      return;
+    }
+    const sheet = event.target;
+    if (sheet.tagName !== "DIALOG" || !sheet.open) return;
+    const box = sheet.getBoundingClientRect();
+    const outside = event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+    if (outside) sheet.close();  // a tap on the dim backdrop
+  });
+
+  document.querySelectorAll("dialog [data-reset-on-close]").forEach(function (part) {
+    const original = part.innerHTML;
+    part.closest("dialog").addEventListener("close", function () {
+      part.innerHTML = original;
+      if (window.htmx) htmx.process(part);
+    });
+  });
 
 })();

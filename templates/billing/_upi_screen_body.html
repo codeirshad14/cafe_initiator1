@@ -6,6 +6,16 @@
     <span class="upi-screen-done"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
     <h1>Payment received</h1>
     <p>Thank you for dining with us!</p>
+    {% if feedback_qr %}
+    {# then: rate the visit (web.views.order_feedback) with the phone camera #}
+    <div class="upi-screen-rate">
+        <img src="{{ feedback_qr }}" alt="QR code to rate your visit">
+        <div>
+            <strong><i class="bi bi-star-fill" aria-hidden="true"></i> Rate your visit</strong>
+            <span>Scan with your phone camera: food, staff and cafe, 3 taps. Your bill is there too.</span>
+        </div>
+    </div>
+    {% endif %}
     {% elif can_make_qr %}
     <p class="upi-screen-label">Bill #{{ bill.bill_no }} · scan and pay</p>
     <p class="upi-screen-amount">{{ amount|inr }}</p>

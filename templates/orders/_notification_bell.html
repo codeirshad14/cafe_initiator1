@@ -1,20 +1,23 @@
 {% comment %}
-The bell in the top bar (orders/notification_views.py): how many new orders nobody has
-opened yet, and the list. Opening one, or Mark all as read, clears it for everyone.
-It redraws itself when anything changes (liveChanged, core/live.py), but not while open.
+The bell in the top bar (orders/notification_views.py): new orders, and for the Floor roles
+the guests' calls from their table ("Table T4: Water please"). Opening one, or Mark all as
+read, clears it for everyone. It redraws itself when anything changes (liveChanged, core/live.py;
+bellCheck while the app is in the background), but not while open.
+data-call-*: the newest call, so static/js/app.js (part 11) rings once and pops it up.
 {% endcomment %}
 {% load money %}
 <div class="dropdown notify" id="notifyBell" hx-get="{% url 'orders:notification_bell' %}" hx-swap="outerHTML"
-     hx-trigger="liveChanged from:body [!document.querySelector('#notifyBell .dropdown-menu.show')], every 60s [!document.querySelector('#notifyBell .dropdown-menu.show')]">
-    <button class="icon-btn notify-btn{% if unread_count %} has-new{% endif %}" type="button" data-bs-toggle="dropdown"
+     hx-trigger="liveChanged from:body [!document.querySelector('#notifyBell .dropdown-menu.show')], bellCheck from:body, every 60s [!document.querySelector('#notifyBell .dropdown-menu.show')]"
+     data-call-id="{{ latest_call.pk|default:0 }}"{% if latest_call %} data-call-text="{{ latest_call.table.label }}: {{ latest_call.get_reason_display }}"{% endif %}>
+    <button class="icon-btn notify-btn{% if unread_count %} has-new{% endif %}{% if latest_call %} has-call{% endif %}" type="button" data-bs-toggle="dropdown"
             data-bs-auto-close="outside" aria-expanded="false"
-            aria-label="Notifications{% if unread_count %}: {{ unread_count }} new order{{ unread_count|pluralize }}{% endif %}">
+            aria-label="Notifications{% if unread_count %}: {{ unread_count }} new{% endif %}">
         <i class="bi bi-bell{% if unread_count %}-fill{% endif %}" aria-hidden="true"></i>
         {% if unread_count %}<span class="notify-count" aria-hidden="true">{% if unread_count > 99 %}99+{% else %}{{ unread_count }}{% endif %}</span>{% endif %}
     </button>
     <div class="dropdown-menu dropdown-menu-end notify-menu">
         <div class="notify-head">
-            <strong>New orders{% if unread_count %} <span class="notify-head-count">{{ unread_count }}</span>{% endif %}</strong>
+            <strong>New{% if unread_count %} <span class="notify-head-count">{{ unread_count }}</span>{% endif %}</strong>
             {% if unread_count %}
             <button type="button" class="notify-read-all" hx-post="{% url 'orders:notification_read_all' %}"
                     hx-target="#notifyBell" hx-swap="outerHTML">
@@ -22,12 +25,26 @@ It redraws itself when anything changes (liveChanged, core/live.py), but not whi
             </button>
             {% endif %}
         </div>
+        {# the installed app (or a browser) can pop calls up on the screen too: static/js/app.js shows this when it can ask #}
+        <button type="button" class="notify-alerts" data-alerts-on hidden>
+            <i class="bi bi-app-indicator" aria-hidden="true"></i> Pop up waiter calls on this device
+        </button>
         <div class="notify-list">
             {% for n in notifications %}
-            {% with o=n.order %}
-            {# opening it marks it read for everyone, then shows the order #}
+            {# opening it marks it read for everyone, then shows the order (a call: its table) #}
             <form method="post" action="{% url 'orders:notification_open' n.pk %}">
                 {% csrf_token %}
+                {% if n.is_call %}
+                <button type="submit" class="notify-item notify-item--call">
+                    <span class="notify-icon notify-icon--call" aria-hidden="true"><i class="bi bi-bell-fill"></i></span>
+                    <span class="notify-text">
+                        <strong>{{ n.table.label }} is calling</strong>
+                        <small>{{ n.get_reason_display }}{% if n.table.section %} · {{ n.table.section }}{% endif %}</small>
+                        <small class="notify-time">{% if n.minutes < 1 %}Just now{% else %}{{ n.minutes|duration }} ago{% endif %} · {{ n.created_at|time:"h:i A" }}</small>
+                    </span>
+                </button>
+                {% else %}
+                {% with o=n.order %}
                 <button type="submit" class="notify-item">
                     <span class="notify-icon notify-icon--{{ o.order_type|lower }}" aria-hidden="true">
                         <i class="bi bi-{% if o.is_delivery %}bicycle{% elif o.is_takeaway %}bag{% else %}grid-3x3-gap{% endif %}"></i>
@@ -38,8 +55,9 @@ It redraws itself when anything changes (liveChanged, core/live.py), but not whi
                         <small class="notify-time">{% if n.minutes < 1 %}Just now{% else %}{{ n.minutes|duration }} ago{% endif %} · {{ n.created_at|time:"h:i A" }}</small>
                     </span>
                 </button>
+                {% endwith %}
+                {% endif %}
             </form>
-            {% endwith %}
             {% empty %}
             <p class="notify-empty"><i class="bi bi-check2-circle" aria-hidden="true"></i> You are all caught up.</p>
             {% endfor %}

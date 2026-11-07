@@ -22,5 +22,16 @@
     {% endif %}
 
     {% include "orders/_track_status.html" %}
+
+    {% if call_table %}
+    {# the guest's bell, outside the part that refreshes itself (so the sheet stays open) #}
+    <button type="button" class="btn btn-light btn-lg w-100 c-call" data-open-dialog="callWaiter" aria-haspopup="dialog">
+        <i class="bi bi-bell-fill" aria-hidden="true"></i> Need anything? Call the waiter
+    </button>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block bottom %}
+{% if call_table %}{% include "orders/_call_waiter.html" %}{% endif %}
 {% endblock %}

@@ -12,12 +12,14 @@ Which order a dine-in round goes on is decided by order_to_join(): people
 at one table share one order (one bill), unless someone picks "My own bill".
 """
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
 from core import roles
+from core.live import bump
 from core.models import Restaurant
 from core.utils import next_number
 from tables.models import takeaway_table
@@ -180,6 +182,31 @@ def place_kot(table, lines, customer_name, customer_phone="", note="", source=Or
         if new_order:  # "New order" in everyone's bell at this location (top bar)
             Notification.objects.create(restaurant=restaurant, location=location, order=order)
     return kot
+
+
+# ---------------------------------------------------------------- the guest's bell
+
+CALL_AGAIN_AFTER = timedelta(minutes=2)  # a second press before this, while nobody answered: no new ring
+
+
+def call_waiter(table, reason=Notification.Reason.CALL, order=None):
+    """A guest at a dining table pressed the bell on their QR menu: the Floor staff's
+    bells ring once (soft sound) with the table and what they want.
+
+    Returns the call, or None when this table already called in the last 2 minutes
+    and nobody has answered it yet (one ring is enough; no ringing on and on)."""
+    waiting = Notification.objects.filter(
+        table=table, kind=Notification.Kind.CALL, read_at__isnull=True,
+        created_at__gte=timezone.now() - CALL_AGAIN_AFTER,
+    )
+    if waiting.exists():
+        return None
+    call = Notification.objects.create(
+        restaurant=table.restaurant, location=table.location, kind=Notification.Kind.CALL,
+        table=table, order=order, reason=reason,
+    )
+    bump(table.restaurant_id)  # every staff screen's bell asks again at once
+    return call
 
 
 # ---------------------------------------------------------------- KOT status

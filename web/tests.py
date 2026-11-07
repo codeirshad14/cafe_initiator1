@@ -129,17 +129,24 @@ class CafeWebsiteTests(TestCase):
     def test_guests_send_feedback_and_the_cafe_reads_it(self):
         from web.models import Feedback
         guest = Client()
-        self.assertContains(guest.post("/cafe/spice-garden/feedback/", {"message": "Great", "name": "Meera"}),
-                            "Please pick the stars.")
-        sent = guest.post("/cafe/spice-garden/feedback/", {"rating": "5", "message": "Loved the paneer!",
+        stars = {"food_rating": "5", "staff_rating": "4", "cafe_rating": "5"}
+        missing = guest.post("/cafe/spice-garden/feedback/", {"food_rating": "5", "message": "Great", "name": "Meera"})
+        self.assertContains(missing, "Please pick the stars for staff.")
+        self.assertContains(missing, "Please pick the stars for cafe.")
+        sent = guest.post("/cafe/spice-garden/feedback/", {**stars, "message": "Loved the paneer!",
                                                            "name": "Meera", "phone": "98765 00011"})
         self.assertContains(sent, "Thank you, Meera!")
         feedback = Feedback.objects.get()
-        self.assertEqual((feedback.restaurant, feedback.rating, feedback.phone), (self.restaurant, 5, "9876500011"))
+        self.assertEqual((feedback.restaurant, feedback.phone), (self.restaurant, "9876500011"))
+        self.assertEqual((feedback.food_rating, feedback.staff_rating, feedback.cafe_rating, feedback.rating),
+                         (5, 4, 5, 5))  # overall: 4.67 rounds to 5
+        self.assertIsNone(feedback.order)
+        # the message is optional
+        self.assertContains(guest.post("/cafe/spice-garden/feedback/", {**stars, "name": "Meera"}), "Thank you, Meera!")
         # the robot trap, and one visitor sending again and again: thanked, not kept
-        guest.post("/cafe/spice-garden/feedback/", {"rating": "1", "message": "spam", "name": "x", "website": "spam.example"})
+        guest.post("/cafe/spice-garden/feedback/", {**stars, "message": "spam", "name": "x", "website": "spam.example"})
         for n in range(4):
-            guest.post("/cafe/spice-garden/feedback/", {"rating": "4", "message": f"again {n}", "name": "Meera"})
+            guest.post("/cafe/spice-garden/feedback/", {**stars, "message": f"again {n}", "name": "Meera"})
         self.assertEqual(Feedback.objects.count(), 3)  # 3 an hour from one visitor
 
         self.assertContains(self.admin.get("/restaurant/website/"), 'class="tab-count"')  # new ones on the tab
@@ -196,3 +203,109 @@ class RestaurantSettingsTests(TestCase):
         self.assertEqual(client_for(make_staff(self.restaurant, "MANAGER")).get("/restaurant/").status_code, 200)
         for role in ("RM", "ALL", "CASHIER"):
             self.assertEqual(client_for(make_staff(self.restaurant, role)).get("/restaurant/").status_code, 403)
+
+
+class RateYourVisitTests(TestCase):
+    """After the bill: "Rate your visit" with the guest's bill and Food, Staff, Cafe stars,
+    once per order; the cafe's website shows the average stars."""
+
+    def setUp(self):
+        from core.testing import guest_orders
+        from orders.models import Order
+        self.restaurant = make_restaurant(upi_id="spicegarden@okicici")
+        _, self.paneer, _ = make_menu(self.restaurant)
+        self.guest = Client()
+        guest_orders(self.guest, make_table(self.restaurant), [self.paneer, self.paneer], name="Meera")
+        self.order = Order.objects.get()
+        self.order.customer_phone = "9876500011"
+        self.order.save()
+        self.url = f"/feedback/{self.order.public_token}/"
+        self.cashier = client_for(make_staff(self.restaurant, "CASHIER"))
+        self.stars = {"food_rating": "5", "staff_rating": "4", "cafe_rating": "3"}
+
+    def make_bill(self):
+        from billing.models import Bill
+        self.cashier.post(f"/billing/create/{self.order.pk}/", {"discount_type": "AMOUNT"})
+        return Bill.objects.get()
+
+    def test_only_once_the_bill_is_made(self):
+        from web.models import Feedback
+        self.assertContains(self.guest.get(self.url), "once your bill is ready")
+        self.guest.post(self.url, self.stars)
+        self.assertFalse(Feedback.objects.exists())
+        self.assertNotContains(self.guest.get(f"/track/{self.order.public_token}/"), "Rate your visit")
+
+    def test_the_guest_rates_with_their_bill_in_view_once(self):
+        from core.templatetags.money import inr
+        from web.models import Feedback
+        bill = self.make_bill()
+        track = self.guest.get(f"/track/{self.order.public_token}/")
+        self.assertContains(track, "How was everything? Rate your visit")
+        self.assertContains(track, f'href="{self.url}"')
+
+        page = self.guest.get(self.url)
+        self.assertContains(page, "How was everything?")
+        for label in ("Food", "Staff", "Cafe"):
+            self.assertContains(page, label)
+        self.assertContains(page, f"Bill #{bill.bill_no}")
+        self.assertContains(page, "2 × Paneer Tikka")
+        self.assertContains(page, inr(bill.grand_total))
+
+        missing = self.guest.post(self.url, {"food_rating": "5"})
+        self.assertContains(missing, "Please pick the stars for staff.")
+        sent = self.guest.post(self.url, self.stars)
+        self.assertRedirects(sent, self.url, fetch_redirect_response=False)
+        feedback = Feedback.objects.get()
+        self.assertEqual((feedback.order, feedback.restaurant, feedback.name, feedback.phone),
+                         (self.order, self.restaurant, "Meera", "9876500011"))
+        self.assertEqual((feedback.food_rating, feedback.staff_rating, feedback.cafe_rating, feedback.rating), (5, 4, 3, 4))
+        thanks = self.guest.get(self.url)
+        self.assertContains(thanks, "Thank you!")
+        self.assertContains(thanks, f"Bill #{bill.bill_no}")  # the bill stays there to look back at
+
+        self.guest.post(self.url, {"food_rating": "1", "staff_rating": "1", "cafe_rating": "1"})  # once per order
+        self.assertEqual(Feedback.objects.get().rating, 4)
+        self.assertContains(self.guest.get(f"/track/{self.order.public_token}/"), "Thank you for rating us")
+
+    def test_staff_send_the_link_and_see_the_stars(self):
+        from web.models import Feedback
+        bill = self.make_bill()
+        page = self.cashier.get(f"/billing/{bill.pk}/")
+        self.assertContains(page, "Guest feedback")
+        self.assertContains(page, f'data-copy="http://testserver{self.url}"')
+        self.assertContains(page, "https://wa.me/919876500011?text=")
+        self.guest.post(self.url, self.stars)
+        page = self.cashier.get(f"/billing/{bill.pk}/")
+        self.assertNotContains(page, "Copy link")
+        self.assertContains(page, "Staff")
+        admin = client_for(make_staff(self.restaurant, "ADMIN"))
+        listing = admin.get("/restaurant/feedback/")
+        self.assertContains(listing, "After the bill")
+        self.assertContains(listing, f"Bill #{bill.bill_no}")
+        self.assertTrue(Feedback.objects.get().is_read)
+
+    def test_the_customer_screen_shows_a_rating_qr_after_paying(self):
+        bill = self.make_bill()
+        self.assertNotContains(self.cashier.get(f"/billing/{bill.pk}/upi/screen/"), "Rate your visit")
+        self.cashier.post(f"/billing/{bill.pk}/upi/paid/", {"reference_no": ""}, HTTP_HX_REQUEST="true")
+        screen = self.cashier.get(f"/billing/{bill.pk}/upi/screen/")
+        self.assertContains(screen, "Payment received")
+        self.assertContains(screen, "Rate your visit")
+        self.assertContains(screen, 'src="data:image/png;base64,')
+
+    def test_the_website_shows_the_average_stars(self):
+        from web.models import CafeWebsite, Feedback
+        Feedback.objects.create(restaurant=self.restaurant, name="A", rating=4, food_rating=5, staff_rating=4, cafe_rating=4)
+        Feedback.objects.create(restaurant=self.restaurant, name="B", rating=3, food_rating=4, staff_rating=2, cafe_rating=3)
+        Feedback.objects.create(restaurant=self.restaurant, name="Old", rating=5, message="Lovely")  # before the 3 questions
+        site = Client().get(f"/cafe/{self.restaurant.slug}/")
+        self.assertContains(site, 'class="cafe-ratings"')
+        self.assertContains(site, "<strong>4.0</strong>")  # (4 + 3 + 5) / 3
+        self.assertContains(site, "from 3 guests")
+        self.assertContains(site, '<strong class="tnum">4.5</strong>')  # food (5 + 4) / 2
+        self.assertContains(site, '<strong class="tnum">3.0</strong>')  # staff
+        self.assertContains(site, 'href="#reviews"')
+        website = CafeWebsite.of(self.restaurant)
+        website.show_ratings = False
+        website.save()
+        self.assertNotContains(Client().get(f"/cafe/{self.restaurant.slug}/"), 'class="cafe-ratings"')

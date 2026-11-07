@@ -12,13 +12,20 @@ A table with separate bills shows a tab per order above it.
     <a class="bill-tab{% if o == order %} is-active{% endif %}" href="{% url 'orders:floor_table' table.pk %}?order={{ o.pk }}"
        {% if o == order %}aria-current="page"{% endif %}>
         <strong>#{{ o.order_no }} · {{ o.customer_name }}</strong>
-        <small>{% if o.status == "BILLED" %}Bill printed{% else %}Open{% endif %}</small>
+        <small>{% if o.joined_bill_id %}Billed together{% elif o.status == "BILLED" %}Bill printed{% else %}Open{% endif %}</small>
     </a>
     {% endfor %}
     {% if can_take_order %}
     <a class="bill-tab bill-tab--new" href="{% url 'orders:waiter_order' table.pk %}?bill=new">
         <strong><i class="bi bi-plus-lg" aria-hidden="true"></i> Separate bill</strong>
         <small>A new order on this table</small>
+    </a>
+    {% endif %}
+    {% if bill_together_url %}
+    {# the same people's orders on this table: one bill, one payment (billing.services.make_bill join) #}
+    <a class="bill-tab bill-tab--together" href="{{ bill_together_url }}">
+        <strong><i class="bi bi-intersect" aria-hidden="true"></i> Bill all together</strong>
+        <small>{{ open_here }} orders · one bill</small>
     </a>
     {% endif %}
 </nav>
@@ -82,6 +89,10 @@ A table with separate bills shows a tab per order above it.
             </div>
         </div>
         <div class="panel-body">
+            {% if order.joined_bill_id and bill %}
+            <p class="together-note"><i class="bi bi-intersect" aria-hidden="true"></i>
+                <span>Billed together on <strong>Bill #{{ bill.bill_no }}</strong> with order #{{ bill.order.order_no }}{% if bill.order.table_id != order.table_id %} ({{ bill.order.place_label }}){% endif %}.</span></p>
+            {% endif %}
             <dl class="info-list info-list--tight">
                 <div><dt>Guest</dt><dd>{{ order.customer_name }}</dd></div>
                 <div><dt>Mobile</dt><dd>{% if order.customer_phone %}<a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a>{% else %}—{% endif %}</dd></div>

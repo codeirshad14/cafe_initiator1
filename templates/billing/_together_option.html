@@ -1,0 +1,10 @@
+{% load money %}
+{# one order that may go on this bill (Generate bill > Bill together); ticking it redraws the dishes and totals #}
+<label class="together-option">
+    <input type="checkbox" name="join" value="{{ o.pk }}"{% if o in joined %} checked{% endif %}>
+    <span class="together-what">
+        <strong>{{ o.table.label }} · #{{ o.order_no }}</strong>
+        <small>{% if o.same_table %}<em class="together-same">This table</em> {% endif %}{{ o.customer_name }} · since {{ o.created_at|time:"h:i A" }}</small>
+    </span>
+    <strong class="tnum">{{ o.amount|inr_short }}</strong>
+</label>

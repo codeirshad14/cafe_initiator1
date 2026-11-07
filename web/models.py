@@ -65,6 +65,8 @@ class CafeWebsite(models.Model):
                                 help_text="10-digit mobile. Empty = no WhatsApp button.")
     instagram = models.URLField(blank=True, help_text="e.g. https://instagram.com/yourcafe")
     facebook = models.URLField(blank=True, help_text="e.g. https://facebook.com/yourcafe")
+    show_ratings = models.BooleanField("show my guests' star ratings", default=True,
+                                       help_text="The average stars for Food, Staff and Cafe, from guests' feedback.")
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -87,15 +89,36 @@ class CafeWebsite(models.Model):
         return [line.strip() for line in self.opening_hours.splitlines() if line.strip()]
 
 
+STARS = [MinValueValidator(1), MaxValueValidator(5)]
+# the three questions, 1 to 5 stars each: (field, label, Bootstrap icon)
+ASPECTS = [
+    ("food_rating", "Food", "egg-fried"),
+    ("staff_rating", "Staff", "person-heart"),
+    ("cafe_rating", "Cafe", "shop"),
+]
+
+
 class Feedback(models.Model):
-    """A guest's feedback from a cafe's website: stars and a message. The cafe reads it
-    in Cafe profile > Feedback and may show it on the website ("What guests say")."""
+    """A guest's stars for Food, Staff and the Cafe (1 to 5 each), from:
+
+      the bill's "Rate your visit" link (web.views.order_feedback): stars only, tied
+        to that order, once per order; the page shows the guest their bill
+      the cafe website's form (web.views.cafe_feedback): the stars and a message
+
+    `rating` is the overall stars (the three's average, rounded); older website
+    feedback has only that. The cafe reads it all in Cafe profile > Feedback; its
+    website shows the average stars, and the ones it picks under "Reviews"."""
 
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name="feedback")
+    order = models.OneToOneField("orders.Order", on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name="feedback")
     name = models.CharField("your name", max_length=80)
     phone = models.CharField("mobile number", max_length=15, blank=True)
-    rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
-    message = models.TextField("your feedback", max_length=1000)
+    rating = models.PositiveSmallIntegerField(validators=STARS)
+    food_rating = models.PositiveSmallIntegerField("food", null=True, blank=True, validators=STARS)
+    staff_rating = models.PositiveSmallIntegerField("staff", null=True, blank=True, validators=STARS)
+    cafe_rating = models.PositiveSmallIntegerField("cafe", null=True, blank=True, validators=STARS)
+    message = models.TextField("your feedback", max_length=1000, blank=True)
     show_on_site = models.BooleanField("show on the website", default=False)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -106,3 +129,34 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"{self.restaurant.name}: {self.rating}★ {self.name}"
+
+    def aspects(self):
+        """[(label, icon, stars)] of the questions answered (none for older website feedback)."""
+        return [(label, icon, getattr(self, field)) for field, label, icon in ASPECTS if getattr(self, field)]
+
+    def set_overall(self):
+        """`rating` from the three answers: their average, rounded (4, 5, 4 -> 4)."""
+        given = [getattr(self, field) for field, _, _ in ASPECTS if getattr(self, field)]
+        if given:
+            self.rating = max(1, min(5, int(sum(given) / len(given) + 0.5)))
+
+
+def rating_summary(feedback):
+    """The stars a cafe shows: overall and each question's average, with how many rated.
+    {"average": 4.6, "stars": 5, "count": 23,
+     "aspects": [{"label": "Food", "icon": ..., "average": 4.7, "stars": 5, "count": 20}, ...]}
+    ("stars": the average as whole stars to fill) or None when nobody has rated yet."""
+    rows = list(feedback.values("rating", *[field for field, _, _ in ASPECTS]))
+    if not rows:
+        return None
+
+    def mean(values):
+        average = round(sum(values) / len(values), 1)
+        return {"average": average, "stars": int(average + 0.5), "count": len(values)}
+
+    aspects = []
+    for field, label, icon in ASPECTS:
+        given = [row[field] for row in rows if row[field]]
+        if given:
+            aspects.append({"label": label, "icon": icon, **mean(given)})
+    return {**mean([row["rating"] for row in rows]), "aspects": aspects}

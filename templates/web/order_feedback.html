@@ -1,0 +1,86 @@
+{% extends "base_customer.html" %}
+{% load money %}
+{% comment %}
+"Rate your visit" (web.views.order_feedback), from the bill's link: three questions,
+Food, Staff and Cafe, 1 to 5 stars each, then the guest's own bill to look back at.
+Once rated, it thanks them and shows their stars instead of the questions.
+{% endcomment %}
+
+{% block title %}Rate your visit · {{ restaurant.name }}{% endblock %}
+{% block app_class %} gm-page{% endblock %}
+
+{% block header %}
+{% include "orders/_customer_header.html" with title="Rate your visit" subtitle=subtitle %}
+{% endblock %}
+
+{% block content %}
+<div class="gm-wrap gm-wrap--narrow gm-inner-page">
+    {% if given %}
+    {# rated: thank them and show their stars #}
+    <section class="c-card rate-done" role="status">
+        <span class="c-placed-check"><i class="bi bi-heart-fill" aria-hidden="true"></i></span>
+        <h1>Thank you!</h1>
+        <p>Your stars help {{ restaurant.name }} get better every day.</p>
+        <ul class="rate-given">
+            {% for label, icon, stars in given.aspects %}
+            <li>
+                <span><i class="bi bi-{{ icon }}" aria-hidden="true"></i> {{ label }}</span>
+                <span class="cafe-stars" aria-label="{{ stars }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= stars %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if website_on %}<a class="btn btn-light w-100" href="{% url 'web:cafe' restaurant.slug %}"><i class="bi bi-globe2" aria-hidden="true"></i> Visit {{ restaurant.name }}'s website</a>{% endif %}
+    </section>
+
+    {% elif bill %}
+    <section class="c-card rate-card">
+        <h1>How was everything?</h1>
+        <p>Tap the stars: 1 is poor, 5 is excellent.</p>
+        <form method="post" novalidate data-submit-once>
+            {% csrf_token %}
+            {% include "web/_star_questions.html" with prefix="visit" %}
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                Send my stars <i class="bi bi-send" aria-hidden="true"></i>
+            </button>
+        </form>
+    </section>
+
+    {% else %}
+    <section class="c-card c-notice c-notice--info" role="status">
+        <i class="bi bi-receipt" aria-hidden="true"></i>
+        <span>You can rate your visit once your bill is ready.
+            <a href="{% url 'orders:order_track' order.public_token %}">See your order</a></span>
+    </section>
+    {% endif %}
+
+    {% if bill %}
+    {# their bill, to look back at #}
+    <section class="c-card guest-bill" aria-labelledby="guestBillTitle">
+        <header class="guest-bill-head">
+            <div>
+                <h2 id="guestBillTitle">Your bill</h2>
+                <small>Bill #{{ bill.bill_no }} · {{ bill.bill_date|date:"d M Y" }} · {{ order.print_label }}</small>
+            </div>
+            <span class="status-badge {% if bill.balance %}status-warning{% else %}status-success{% endif %}">{% if bill.balance %}To pay{% else %}Paid{% endif %}</span>
+        </header>
+        <ul class="c-kot-items">
+            {% for line in items %}
+            <li><span>{{ line.qty }} × {{ line.item_name }}</span><span>{{ line.amount|inr_short }}</span></li>
+            {% endfor %}
+        </ul>
+        <dl class="guest-bill-totals">
+            <div><dt>Subtotal</dt><dd>{{ bill.subtotal|inr }}</dd></div>
+            {% if bill.discount_amount %}<div><dt>Discount{% if bill.offer_name %} ({{ bill.offer_name }}){% endif %}</dt><dd>&minus; {{ bill.discount_amount|inr }}</dd></div>{% endif %}
+            {% if bill.delivery_charge %}<div><dt>Delivery charge</dt><dd>{{ bill.delivery_charge|inr }}</dd></div>{% endif %}
+            {% if bill.tax_amount %}<div><dt>GST</dt><dd>{{ bill.tax_amount|inr }}</dd></div>{% endif %}
+            {% if bill.round_off %}<div><dt>Round off</dt><dd>{{ bill.round_off|inr }}</dd></div>{% endif %}
+            <div class="guest-bill-grand"><dt>Total</dt><dd>{{ bill.grand_total|inr }}</dd></div>
+            {% for p in payments %}<div class="guest-bill-paid"><dt>Paid · {{ p.get_mode_display }}</dt><dd>{{ p.amount|inr }}</dd></div>{% endfor %}
+            {% if bill.balance %}<div class="guest-bill-grand"><dt>Still to pay</dt><dd>{{ bill.balance|inr }}</dd></div>{% endif %}
+        </dl>
+    </section>
+    {% endif %}
+
+    <p class="rate-foot">{{ restaurant.name }}{% if restaurant.phone %} · <a href="tel:{{ restaurant.phone|cut:' ' }}">{{ restaurant.phone }}</a>{% endif %}</p>
+</div>
+{% endblock %}

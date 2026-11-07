@@ -1,0 +1,33 @@
+{% load money %}
+{# the dishes on the bill to be made; redrawn (out of band) when an order is ticked under "Bill together" #}
+<section class="panel" id="billLines"{% if oob %} hx-swap-oob="true"{% endif %}>
+    <div class="panel-head">
+        <div>
+            <h2 class="panel-title">Dishes</h2>
+            <p class="panel-sub">{% if joined %}<strong>Orders #{{ order.order_no }}{% for o in joined %} + #{{ o.order_no }}{% endfor %}</strong> on one bill. {% endif %}The same dish from different rounds is shown as one line.</p>
+        </div>
+    </div>
+    {% if lines %}
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+                {% for line in lines %}
+                <tr>
+                    <td><strong>{{ line.item_name }}</strong><br><small class="text-body-secondary">{{ line.category_name }}</small></td>
+                    <td class="num">{{ line.qty }}</td>
+                    <td class="num">{{ line.rate|inr }}</td>
+                    <td class="num"><strong>{{ line.amount|inr }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
+        <h3>Nothing to bill</h3>
+        <p>Every round of this order was cancelled. Cancel the order from the table page instead.</p>
+    </div>
+    {% endif %}
+</section>

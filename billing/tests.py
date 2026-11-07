@@ -282,3 +282,114 @@ class BillingFlowTests(TestCase):
     def test_waiter_cannot_bill(self):
         waiter = client_for(make_staff(self.restaurant, "WAITER"))
         self.assertEqual(waiter.get(f"/billing/create/{self.order.pk}/").status_code, 403)
+
+
+class BillTogetherTests(TestCase):
+    """The same people's orders (one table's two orders, or a big family's two tables)
+    on one bill and one payment; each order keeps its table and KOTs."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant()
+        _, self.paneer, self.naan = make_menu(self.restaurant)
+        self.t1, self.t2 = make_table(self.restaurant, "T1"), make_table(self.restaurant, "T2")
+        self.cashier_staff = make_staff(self.restaurant, "CASHIER")
+        self.cashier = client_for(self.cashier_staff)
+
+    def order_at(self, table, dish, name, **extra):
+        guest = Client()
+        guest.post(f"/m/{table.qr_token}/cart/add/{dish.pk}/", **HTMX)
+        guest.post(f"/m/{table.qr_token}/place/", {"customer_name": name, **extra})
+        return Order.objects.get(customer_name=name), guest
+
+    def test_one_tables_two_orders_on_one_bill_and_one_payment(self):
+        from billing.services import add_payment
+        meera, _ = self.order_at(self.t1, self.paneer, "Meera")
+        ravi, _ = self.order_at(self.t1, self.naan, "Ravi", bill="new")  # the same family, a second order
+
+        table_page = self.cashier.get(f"/floor/table/{self.t1.pk}/")
+        self.assertContains(table_page, "Bill all together")
+        self.assertContains(table_page, f"/billing/create/{meera.pk}/?join={ravi.pk}")
+        bills_page = self.cashier.get("/billing/")
+        self.assertContains(bills_page, "Bill together (2 orders)")
+        self.assertContains(bills_page, f"Same table as #{meera.order_no}")
+
+        preview = self.cashier.get(f"/billing/create/{meera.pk}/?join={ravi.pk}")
+        self.assertContains(preview, f'name="join" value="{ravi.pk}" checked')
+        self.assertContains(preview, "This table")
+        self.assertContains(preview, "Paneer Tikka")
+        self.assertContains(preview, "Butter Naan")
+        alone = self.cashier.get(f"/billing/create/{meera.pk}/", HTTP_HX_REQUEST="true")  # unticked: Meera's only
+        self.assertNotContains(alone, "Butter Naan")
+
+        self.cashier.post(f"/billing/create/{meera.pk}/", {"discount_type": "AMOUNT", "join": [ravi.pk]})
+        bill = Bill.objects.get()
+        self.assertEqual(sorted(bill.items.values_list("item_name", flat=True)), ["Butter Naan", "Paneer Tikka"])
+        self.assertEqual(bill.subtotal, D("309.00"))
+        meera.refresh_from_db()
+        ravi.refresh_from_db()
+        self.assertEqual((meera.status, ravi.status, ravi.joined_bill), ("BILLED", "BILLED", bill))
+        self.assertEqual((bill.place_label, bill.order_numbers), ("Table T1", f"#{meera.order_no} + #{ravi.order_no}"))
+        self.assertEqual(ravi.kots.count(), 1)  # its rounds stay its own
+
+        add_payment(bill, "CASH", bill.grand_total, "", self.cashier_staff)
+        meera.refresh_from_db()
+        ravi.refresh_from_db()
+        self.assertEqual((meera.status, ravi.status), ("CLOSED", "CLOSED"))
+        self.assertEqual(Bill.objects.count(), 1)  # one bill, not two
+
+    def test_a_big_family_on_two_tables(self):
+        family, _ = self.order_at(self.t1, self.paneer, "Sharma")
+        kids, kids_phone = self.order_at(self.t2, self.naan, "Sharma kids")
+        preview = self.cashier.get(f"/billing/create/{family.pk}/")
+        self.assertContains(preview, "Table T2 · #")  # other tables can be ticked too
+        self.assertNotContains(preview, f'value="{kids.pk}" checked')  # never ticked by itself
+
+        self.cashier.post(f"/billing/create/{family.pk}/", {"discount_type": "AMOUNT", "join": [kids.pk]})
+        bill = Bill.objects.get()
+        self.assertEqual(bill.place_label, "Tables T1 + T2")
+        printed = self.cashier.get(f"/billing/{bill.pk}/print/")
+        self.assertContains(printed, "Dine in · Tables T1 + T2")
+        self.assertContains(printed, f"Order: #{family.order_no} + #{kids.order_no}")
+        self.assertIn(b"Dine in \xb7 Tables T1 + T2".decode("latin-1").encode("cp437", "replace"),
+                      self.cashier.get(f"/billing/{bill.pk}/print/slip/").content)
+        self.assertContains(self.cashier.get(f"/billing/{bill.pk}/"), "One bill for 2 orders")
+
+        # T2 stays taken until the bill is paid; its page and its guest see the shared bill
+        floor = client_for(self.cashier_staff).get(f"/floor/table/{self.t2.pk}/")
+        self.assertContains(floor, f"Billed together on <strong>Bill #{bill.bill_no}</strong>")
+        self.assertContains(floor, f"Take payment · Bill #{bill.bill_no}")
+        self.assertContains(kids_phone.get(f"/track/{kids.public_token}/"), "Rate your visit")
+        self.assertContains(self.cashier.get(f"/billing/create/{kids.pk}/"), "", status_code=302)
+
+    def test_reopen_or_cancel_lets_them_go_back_to_their_own_orders(self):
+        from billing.services import cancel_bill, make_bill, reopen_order
+        meera, _ = self.order_at(self.t1, self.paneer, "Meera")
+        ravi, _ = self.order_at(self.t1, self.naan, "Ravi", bill="new")
+        bill = make_bill(meera, self.cashier_staff, join=[ravi])
+
+        manager = client_for(make_staff(self.restaurant, "MANAGER"))
+        blocked = manager.get(f"/orders/{ravi.pk}/cancel/", HTTP_HX_REQUEST="true")
+        self.assertContains(blocked, f"billed together on Bill #{bill.bill_no}")
+
+        reopen_order(bill)
+        ravi.refresh_from_db()
+        self.assertEqual((ravi.status, ravi.joined_bill), ("OPEN", None))
+        bill = make_bill(meera, self.cashier_staff, join=[ravi])  # ticked again: the same bill number
+        cancel_bill(bill, "Wrong table")
+        meera.refresh_from_db()
+        ravi.refresh_from_db()
+        self.assertEqual((meera.status, ravi.status, ravi.joined_bill), ("CANCELLED", "OPEN", None))
+
+    def test_only_open_dine_in_orders_of_this_location(self):
+        from billing.services import BillingError, joinable_orders, make_bill
+        meera, _ = self.order_at(self.t1, self.paneer, "Meera")
+        parcel, _ = self.order_at(self.t2, self.naan, "Parcel", order_type="TAKEAWAY")
+        self.assertNotIn(parcel, joinable_orders(meera))
+        self.assertFalse(joinable_orders(parcel).exists())  # a parcel is billed on its own
+        other_place = make_restaurant("Green Leaf")
+        _, other_dish, _ = make_menu(other_place)
+        theirs, _ = self.order_at(make_table(other_place, "X1"), other_dish, "Stranger")
+        self.assertNotIn(theirs, joinable_orders(meera))
+        with self.assertRaises(BillingError):
+            make_bill(meera, self.cashier_staff, join=[theirs])
+        self.assertEqual(Order.objects.get(pk=meera.pk).status, "OPEN")  # nothing billed

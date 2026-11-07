@@ -26,9 +26,9 @@
     <div class="slip-rule"></div>
 
     <div class="slip-row"><span>Bill No: {{ bill.bill_no }}</span><span>{{ bill.bill_date|date:"d-m-Y" }}</span></div>
-    <div class="slip-row"><span>{{ bill.order.print_label }}</span><span>{{ bill.created_at|time:"h:i A" }}</span></div>
+    <div class="slip-row"><span>{{ bill.print_label }}</span><span>{{ bill.created_at|time:"h:i A" }}</span></div>
     {% if bill.order.is_parcel and bill.order.customer_phone %}<div class="slip-row"><span>Mobile</span><span>{{ bill.order.customer_phone }}</span></div>{% endif %}
-    <div class="slip-row"><span>Order: #{{ bill.order.order_no }}</span><span>{{ bill.order.customer_name|truncatechars:16 }}</span></div>
+    <div class="slip-row"><span>Order: {{ bill.order_numbers }}</span><span>{{ bill.order.customer_name|truncatechars:16 }}</span></div>
     {% if bill.order.customer_address %}<div class="slip-note">Address: {{ bill.order.customer_address }}</div>{% endif %}
     {% if bill.order.is_delivery and bill.order.rider %}<div class="slip-row"><span>Rider</span><span>{{ bill.order.rider.name }}</span></div>{% endif %}
     <div class="slip-rule"></div>

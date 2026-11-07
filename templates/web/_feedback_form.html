@@ -1,21 +1,12 @@
 {% comment %}
 The feedback form on a cafe's website. Sent by HTMX; errors come back in this same form,
-success swaps in _feedback_thanks.html. The stars are radio buttons 5 … 1 drawn right to
-left, so the CSS lights every star up to the one picked (.star-pick).
+success swaps in _feedback_thanks.html. Food, Staff and Cafe stars (web/_star_questions.html),
+a message if they like, their name, the mobile for a call back.
 {% endcomment %}
 <form hx-post="{% url 'web:cafe_feedback' restaurant.slug %}" hx-target="#feedbackBox" hx-disabled-elt="find button[type=submit]" novalidate>
     <h3 class="cta-card-title">How was your visit?</h3>
 
-    <fieldset class="field-block{% if form.rating.errors %} has-error{% endif %}">
-        <legend class="form-label">Your rating <span class="req" aria-hidden="true">*</span></legend>
-        <div class="star-pick">
-            {% for value, label in form.rating.field.choices %}
-            <input type="radio" name="rating" value="{{ value }}" id="star{{ value }}"{% if form.rating.value|stringformat:"s" == value|stringformat:"s" %} checked{% endif %}>
-            <label for="star{{ value }}" title="{{ label }}"><i class="bi bi-star-fill" aria-hidden="true"></i><span class="visually-hidden">{{ label }}</span></label>
-            {% endfor %}
-        </div>
-        {% for error in form.rating.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-    </fieldset>
+    {% include "web/_star_questions.html" with prefix="site" %}
 
     {% include "partials/_field.html" with field=form.message %}
     <div class="field-row">

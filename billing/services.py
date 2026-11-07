@@ -3,14 +3,19 @@ Billing steps. Each runs inside transaction.atomic() and locks the rows it
 changes, so two cashiers pressing at the same moment cannot double-bill or
 double-pay.
 
-    make_bill      OPEN order  -> bill made, order BILLED (table shows "bill printed")
+    make_bill      OPEN order  -> bill made, order BILLED (table shows "bill printed").
+                   "Bill together": other open dine-in orders of the location (the same
+                   people's second order at the table, a big family's other table) go on
+                   the same bill; each keeps its table and KOTs, all are BILLED
     add_payment    one payment row; when the payments cover the total: bill PAID,
-                   order CLOSED, table free
+                   its orders CLOSED, their tables free
     add_payments   two (or more) rows at once: a split payment, e.g. cash + UPI
     remove_payment undo a payment typed by mistake (bill not fully paid yet)
-    reopen_order   unpaid bill, guests want more: order back to OPEN; the next
-                   "Generate bill" redoes this same bill (same number)
-    cancel_bill    void an unpaid bill and its order
+    reopen_order   unpaid bill, guests want more: order back to OPEN (orders billed with
+                   it too, each on its own again); the next "Generate bill" redoes this
+                   same bill (same number)
+    cancel_bill    void an unpaid bill and its order (orders billed with it go back to
+                   open, to be billed again)
 """
 
 from django.db import transaction
@@ -31,16 +36,16 @@ class BillingError(Exception):
     """A billing step that is not allowed right now; the message says why, for the screen."""
 
 
-def billable_lines(order):
-    """The order's dishes as bill lines: the same dish (and portion) at the same
-    rate across rounds is one line.
+def billable_lines(order, joined=()):
+    """The order's dishes (and those of the orders billed together with it) as bill lines:
+    the same dish (and portion) at the same rate across rounds is one line.
 
     Cancelled dishes and cancelled KOTs are left out. A dish whose price changed
     between rounds stays on two lines, each with its own rate; so do its
     portions ("Butter Chicken (Half)" and "(Full)").
     """
     kot_items = (
-        KOTItem.objects.filter(kot__order=order, is_cancelled=False)
+        KOTItem.objects.filter(kot__order__in=[order.pk, *[other.pk for other in joined]], is_cancelled=False)
         .exclude(kot__status=KOT.Status.CANCELLED)
         .select_related("menu_item__category")
         .order_by("kot__created_at", "pk")
@@ -71,9 +76,22 @@ def offer_for(restaurant, day, subtotal):
     return max(offers, key=lambda offer: discount_amount_for(subtotal, offer.kind, offer.value), default=None)
 
 
-def preview_totals(order, discount_type, discount_value):
-    """Lines and totals as they would be billed, without saving anything (for the preview)."""
-    lines = billable_lines(order)
+def joinable_orders(order):
+    """The open orders that may go on this order's bill ("Bill together"): dine-in orders of
+    the same location without a bill of their own, this table's first, then by table.
+    A parcel (take away, delivery) is billed on its own."""
+    if order.order_type != Order.OrderType.DINE_IN:
+        return Order.objects.none()
+    return (Order.objects.filter(location=order.location, status=Order.Status.OPEN,
+                                 order_type=Order.OrderType.DINE_IN, bill__isnull=True, joined_bill__isnull=True)
+            .exclude(pk=order.pk).select_related("table")
+            .order_by("table__name", "created_at"))
+
+
+def preview_totals(order, discount_type, discount_value, joined=()):
+    """Lines and totals as they would be billed, without saving anything (for the preview).
+    joined: the orders billed together with this one."""
+    lines = billable_lines(order, joined)
     subtotal = sum((line["amount"] for line in lines), ZERO)
     discount = discount_amount_for(subtotal, discount_type, discount_value)
     # delivery: the restaurant's charge, free from its free-delivery amount (after discount)
@@ -81,16 +99,22 @@ def preview_totals(order, discount_type, discount_value):
     return lines, bill_totals(subtotal, discount, order.restaurant.gst_percent, delivery)
 
 
-def make_bill(order, staff, discount_type="AMOUNT", discount_value=0, offer_name=""):
+def make_bill(order, staff, discount_type="AMOUNT", discount_value=0, offer_name="", join=()):
     """Bill an OPEN order. Returns the bill. A reopened order gets its own unpaid bill redone.
-    offer_name: the festival offer the discount comes from (printed next to it)."""
+    offer_name: the festival offer the discount comes from (printed next to it).
+    join: other open orders to bill together on this one bill (see joinable_orders)."""
     with transaction.atomic():
         restaurant = Restaurant.objects.select_for_update().get(pk=order.restaurant_id)
         order = Order.objects.select_for_update().get(pk=order.pk)
         if order.status != Order.Status.OPEN:
             raise BillingError(f"Order #{order.order_no} is {order.get_status_display().lower()}, so it cannot be billed.")
 
-        lines, totals = preview_totals(order, discount_type, discount_value)
+        wanted = {other.pk for other in join}
+        joined = list(joinable_orders(order).select_for_update(of=("self",)).filter(pk__in=wanted))
+        if len(joined) != len(wanted):
+            raise BillingError("One of the orders to bill together was billed or changed a moment ago. Please pick again.")
+
+        lines, totals = preview_totals(order, discount_type, discount_value, joined)
         if not lines:
             raise BillingError("This order has nothing to bill. Cancel the order instead.")
 
@@ -124,25 +148,36 @@ def make_bill(order, staff, discount_type="AMOUNT", discount_value=0, offer_name
 
         order.status = Order.Status.BILLED
         order.save(update_fields=["status"])
+        for other in joined:  # billed together: each keeps its table, all wait for this bill
+            other.status, other.joined_bill = Order.Status.BILLED, bill
+            other.save(update_fields=["status", "joined_bill"])
 
         if bill.grand_total == ZERO:  # a 100% discount: nothing to collect
             settle(bill)
     return bill
 
 
+def release_joined(bill):
+    """The orders billed together on this bill go back to open, each on its own again."""
+    for other in bill.joined_orders.all():
+        other.status, other.joined_bill = Order.Status.OPEN, None
+        other.save(update_fields=["status", "joined_bill"])
+
+
 def settle(bill):
     """Recount what is paid from the payment rows and set the status.
 
-    Fully paid: bill PAID, order CLOSED, table free. Call inside
-    transaction.atomic() with the bill row locked.
+    Fully paid: bill PAID, its order (and the orders billed together on it) CLOSED,
+    their tables free. Call inside transaction.atomic() with the bill row locked.
     """
     bill.paid_amount = bill.payments.aggregate(total=Sum("amount"))["total"] or ZERO
     if bill.paid_amount >= bill.grand_total:
         bill.status = Bill.Status.PAID
-        order = bill.order
-        order.status = Order.Status.CLOSED
-        order.closed_at = timezone.now()
-        order.save(update_fields=["status", "closed_at"])
+        now = timezone.now()
+        for order in [bill.order, *bill.joined_orders.all()]:
+            order.status = Order.Status.CLOSED
+            order.closed_at = now
+            order.save(update_fields=["status", "closed_at"])
     elif bill.paid_amount > ZERO:
         bill.status = Bill.Status.PARTIAL
     else:
@@ -207,6 +242,7 @@ def reopen_order(bill):
             raise BillingError("The order is already open.")
         bill.order.status = Order.Status.OPEN
         bill.order.save(update_fields=["status"])
+        release_joined(bill)  # ticked again when the bill is generated again
     return bill
 
 
@@ -222,4 +258,5 @@ def cancel_bill(bill, reason):
         bill.cancel_reason = reason
         bill.save(update_fields=["status", "cancel_reason"])
         cancel_order(bill.order, reason)
+        release_joined(bill)  # their food is still to be paid: back to open, billed again
     return bill

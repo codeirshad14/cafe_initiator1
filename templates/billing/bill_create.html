@@ -9,7 +9,7 @@
 {% if unserved %}
 <div class="alert alert-warning d-flex gap-2 align-items-start mb-0" role="status">
     <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-    <span>{{ unserved }} round{{ unserved|pluralize }} {{ unserved|pluralize:"is,are" }} not served yet. You can still bill now; those dishes are included.</span>
+    <span>{{ unserved }} round{{ unserved|pluralize }} {{ unserved|pluralize:"is,are" }} not served yet. You can still bill now; those dishes are included.{% if joined %} (Counting the orders ticked to bill together.){% endif %}</span>
 </div>
 {% endif %}
 {% if redo %}
@@ -20,42 +20,29 @@
 {% endif %}
 
 <div class="split-grid">
-    <section class="panel">
-        <div class="panel-head">
-            <div>
-                <h2 class="panel-title">Dishes</h2>
-                <p class="panel-sub">The same dish from different rounds is shown as one line.</p>
-            </div>
-        </div>
-        {% if lines %}
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
-                <tbody>
-                    {% for line in lines %}
-                    <tr>
-                        <td><strong>{{ line.item_name }}</strong><br><small class="text-body-secondary">{{ line.category_name }}</small></td>
-                        <td class="num">{{ line.qty }}</td>
-                        <td class="num">{{ line.rate|inr }}</td>
-                        <td class="num"><strong>{{ line.amount|inr }}</strong></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <span class="empty-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
-            <h3>Nothing to bill</h3>
-            <p>Every round of this order was cancelled. Cancel the order from the table page instead.</p>
-        </div>
-        {% endif %}
-    </section>
+    {% include "billing/_bill_lines.html" %}
 
     <aside class="panel bill-side">
         <form method="post" id="billForm" novalidate
               hx-get="{% url 'billing:bill_create' order.pk %}" hx-trigger="input delay:300ms, change" hx-target="#billTotals" hx-swap="outerHTML">
             {% csrf_token %}
+            {% if candidates %}
+            {# "Bill together": the same people's other orders (this table first), or a big family's other table #}
+            <div class="panel-head"><h2 class="panel-title"><i class="bi bi-intersect" aria-hidden="true"></i> Bill together</h2></div>
+            <div class="panel-body together-pick">
+                <p class="form-hint">Same guests, more orders? Tick them: one bill, one payment. Each order keeps its own table and rounds.</p>
+                {% for o in candidates %}{% if o.same_table %}{% include "billing/_together_option.html" %}{% endif %}{% endfor %}
+                {% if other_tables %}
+                {# a big family on more tables: the other tables' orders, folded away until needed #}
+                <details class="together-more"{% if other_ticked %} open{% endif %}>
+                    <summary>Other tables <span class="together-more-count">{{ other_tables }}</span></summary>
+                    <div class="together-more-list">
+                        {% for o in candidates %}{% if not o.same_table %}{% include "billing/_together_option.html" %}{% endif %}{% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+            {% endif %}
             <div class="panel-head"><h2 class="panel-title">Discount</h2></div>
             <div class="panel-body">
                 {% if offer %}

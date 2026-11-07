@@ -15,6 +15,23 @@ or cancelled it stops asking.
         </div>
     </section>
 
+    {% if bill %}
+    {# the bill is made: "Rate your visit" (web.views.order_feedback), or their stars once rated #}
+    <a class="c-card c-rate{% if feedback %} is-done{% endif %}" href="{% url 'web:order_feedback' order.public_token %}">
+        <span class="c-rate-icon" aria-hidden="true"><i class="bi bi-{% if feedback %}heart-fill{% else %}star-fill{% endif %}"></i></span>
+        <span class="c-rate-text">
+            {% if feedback %}
+            <strong>Thank you for rating us</strong>
+            <small><span class="cafe-stars" aria-label="{{ feedback.rating }} of 5 stars">{% for n in "12345" %}<i class="bi bi-star{% if forloop.counter <= feedback.rating %}-fill{% endif %}" aria-hidden="true"></i>{% endfor %}</span> · see your bill</small>
+            {% else %}
+            <strong>How was everything? Rate your visit</strong>
+            <small>Food, staff and cafe: tap the stars. Your bill is there too.</small>
+            {% endif %}
+        </span>
+        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </a>
+    {% endif %}
+
     {% if delivery_steps %}
     {# a delivery: one progress line from placed to delivered, the address and what to pay #}
     <section class="c-card">

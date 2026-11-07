@@ -54,6 +54,34 @@ class Bill(models.Model):
             self.location = self.order.location
         super().save(*args, **kwargs)
 
+    def all_orders(self):
+        """Its order, then the orders billed together on it (billing.services.make_bill join)."""
+        return [self.order, *sorted(self.joined_orders.all(), key=lambda order: order.order_no)]
+
+    def _tables(self):
+        names = []
+        for order in self.all_orders():
+            if order.table_id and order.table.name not in names:
+                names.append(order.table.name)
+        return names
+
+    @property
+    def place_label(self):
+        """For screens: "Table T1", or billed together across tables: "Tables T1 + T2"."""
+        names = self._tables() if self.joined_orders.exists() else []
+        return f"Tables {' + '.join(names)}" if len(names) > 1 else self.order.place_label
+
+    @property
+    def print_label(self):
+        """As the bill prints it: "Dine in · Table T1", or "Dine in · Tables T1 + T2"."""
+        names = self._tables() if self.joined_orders.exists() else []
+        return f"Dine in · Tables {' + '.join(names)}" if len(names) > 1 else self.order.print_label
+
+    @property
+    def order_numbers(self):
+        """"#210", or billed together: "#210 + #211"."""
+        return " + ".join(f"#{order.order_no}" for order in self.all_orders())
+
     @property
     def balance(self):
         """Amount still to be paid (never below zero)."""

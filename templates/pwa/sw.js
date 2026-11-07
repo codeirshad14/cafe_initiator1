@@ -34,6 +34,20 @@ self.addEventListener("activate", function (event) {
   );
 });
 
+// a waiter call popped up on the device (static/js/app.js part 11): a tap opens the app
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/home/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (windows) {
+      for (const open of windows) {
+        if (new URL(open.url).origin === self.location.origin && "focus" in open) return open.focus();
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener("fetch", function (event) {
   const request = event.request;
   if (request.method !== "GET") return;

@@ -5005,8 +5005,14 @@ fieldset.field-block {
 }
 .to-bill-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+/* "Bill together (2)": a full row of its own above View / Make bill */
+.to-bill-actions .to-bill-together {
+  flex: 1 1 100%;
+  order: -1;
 }
 
 .bill-side {
@@ -8433,6 +8439,107 @@ body.gm-sheet-open {
   border-style: dashed;
   color: var(--brand-600);
 }
+/* "Bill all together": the table's orders on one bill */
+.bill-tab--together {
+  border-color: var(--brand-solid);
+  background: var(--brand-solid);
+  color: #fff;
+}
+.bill-tab--together:hover {
+  color: #fff;
+  background: var(--brand-600);
+}
+.bill-tab--together small {
+  color: rgba(255, 255, 255, 0.85);
+}
+.together-note {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 0.88rem;
+}
+/* Generate bill > Bill together: tick the other orders */
+.together-pick {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+.together-pick .form-hint {
+  margin: 0 0 2px;
+}
+.together-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.together-option:has(input:checked) {
+  border-color: var(--brand-solid);
+  background: var(--brand-50);
+}
+.together-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-solid);
+}
+.together-what {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.together-what small {
+  color: var(--ink-3);
+}
+.together-more {
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+}
+.together-more summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--ink-2);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.together-more-count {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+.together-more-list {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+.together-same {
+  margin-right: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--brand-50);
+  color: var(--brand-600);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+}
+.together-alert a {
+  font-weight: 600;
+}
 
 /* ============ 19. POS: the staff order screen + the floor's counter chips ============ */
 
@@ -10520,6 +10627,485 @@ a.ceo-kpi:hover {
 }
 .role-no {
   color: var(--ink-3);
+}
+
+/* ============ 26. The guest's bell and "Rate your visit" ============ */
+/* the table menu's bell: a round button beside "Order #" / Track */
+.gm-bell {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--warn-bg);
+  color: #b45309;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.18);
+}
+.gm-bell:hover,
+.gm-bell:focus-visible {
+  background: #fde7c4;
+}
+.gm-bell + .gm-pill {
+  margin-left: -4px;
+}
+.c-call {
+  margin-top: 12px;
+}
+.c-call i {
+  color: #b45309;
+}
+
+/* the call sheet (orders/_call_waiter.html) */
+.call-sheet {
+  width: min(420px, calc(100vw - 24px));
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(29, 26, 23, 0.25);
+}
+.call-sheet::backdrop {
+  background: rgba(29, 26, 23, 0.45);
+}
+.call-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.call-sheet-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.call-sheet-head p {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.call-sheet-bell {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--warn-bg);
+  color: #b45309;
+  font-size: 1.3rem;
+}
+.call-sheet-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.call-option {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-height: 92px;
+  padding: 12px 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+.call-option i {
+  color: var(--brand-solid);
+  font-size: 1.5rem;
+}
+.call-option:hover,
+.call-option:focus-visible {
+  border-color: rgba(var(--brand-rgb), 0.4);
+  background: var(--brand-50);
+}
+.call-option:disabled {
+  opacity: 0.6;
+}
+.call-sheet-done {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--ok-bg);
+  text-align: center;
+}
+.call-sheet-done i {
+  color: var(--ok);
+  font-size: 2rem;
+}
+.call-sheet-done span {
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+
+/* the staff bell: a guest's call stands out in amber */
+.notify-icon--call {
+  background: var(--warn-bg);
+  color: #b45309;
+}
+.notify-btn.has-call {
+  color: #b45309;
+}
+.notify-btn.has-call i {
+  animation: bell-shake 1.2s ease-in-out 2;
+}
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-12deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-4deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notify-btn.has-call i {
+    animation: none;
+  }
+}
+.notify-alerts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* the order page's "Rate your visit" card */
+.c-rate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  border-color: #f6d58b;
+  background: #fffaf0;
+}
+.c-rate:hover {
+  color: var(--ink);
+  border-color: #f2a516;
+}
+.c-rate.is-done {
+  border-color: var(--line);
+  background: var(--surface);
+}
+.c-rate-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fdecc8;
+  color: #f2a516;
+  font-size: 1.25rem;
+}
+.c-rate.is-done .c-rate-icon {
+  background: var(--brand-50);
+  color: var(--brand-solid);
+}
+.c-rate-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.c-rate-text small {
+  color: var(--ink-2);
+}
+
+/* "Rate your visit" (web/order_feedback.html) */
+.rate-card h1,
+.rate-done h1 {
+  margin: 0 0 4px;
+  font-size: 1.35rem;
+}
+.rate-card > p,
+.rate-done > p {
+  margin: 0 0 16px;
+  color: var(--ink-2);
+}
+.rate-done {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.rate-done .c-placed-check {
+  background: var(--brand-solid);
+  box-shadow: 0 10px 24px rgba(var(--brand-rgb), 0.3);
+}
+.rate-given {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.rate-given li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.star-questions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.star-question {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.star-question.has-error {
+  border-color: var(--bad);
+}
+.star-question legend {
+  float: left;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+.star-question legend i {
+  color: var(--brand-solid);
+}
+.star-question .star-pick label {
+  font-size: 1.7rem;
+}
+.star-question .field-error {
+  flex-basis: 100%;
+}
+.guest-bill {
+  margin-top: 14px;
+}
+.guest-bill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.guest-bill-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.guest-bill-head small {
+  color: var(--ink-3);
+}
+.guest-bill-totals {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 0.9rem;
+}
+.guest-bill-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.guest-bill-totals dt {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.guest-bill-totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.guest-bill-grand {
+  padding-top: 4px;
+  font-size: 1.02rem;
+}
+.guest-bill-grand dt,
+.guest-bill-grand dd {
+  color: var(--ink);
+  font-weight: 700;
+}
+.guest-bill-paid dd {
+  color: var(--ok);
+}
+.rate-foot {
+  margin: 16px 0 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* the cafe website's average stars */
+.cafe-ratings {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.cafe-ratings-overall,
+.cafe-rating-row {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 18px 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: center;
+}
+.cafe-ratings-overall strong {
+  font-family: var(--font-head);
+  font-size: 2.6rem;
+  line-height: 1;
+}
+.cafe-ratings-overall small {
+  color: var(--ink-3);
+}
+.cafe-stars--big {
+  font-size: 1.2rem;
+}
+.cafe-rating-name {
+  font-weight: 700;
+}
+.cafe-rating-name i {
+  color: var(--brand-solid);
+}
+.cafe-rating-row strong {
+  font-family: var(--font-head);
+  font-size: 1.4rem;
+}
+.cafe-review-aspects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 12px 0 14px;
+  font-weight: 600;
+}
+.cafe-review-aspects i {
+  margin-left: 2px;
+  color: #f2a516;
+}
+@media (max-width: 767.98px) {
+  .cafe-ratings {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .cafe-ratings-overall {
+    grid-column: 1 / -1;
+  }
+  .cafe-rating-row {
+    padding: 12px 6px;
+  }
+  .cafe-rating-row .cafe-stars {
+    font-size: 0.7rem;
+  }
+}
+
+/* Cafe profile > Feedback and the bill's "Guest feedback" */
+.feedback-aspects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.9rem;
+}
+.feedback-aspects i:first-child {
+  color: var(--brand-solid);
+}
+.feedback-star {
+  margin-left: 2px;
+  color: #f2a516;
+  font-size: 0.75rem;
+}
+.rating-aspects {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+.rating-aspects li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+.rating-aspects li > span i {
+  color: var(--brand-solid);
+}
+.rating-aspects strong i {
+  color: #f2a516;
+  font-size: 0.75rem;
+}
+.rating-aspects small {
+  min-width: 24px;
+  color: var(--ink-3);
+  text-align: right;
+}
+.feedback-share {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* the customer screen after paying: rate the visit */
+.upi-screen-rate {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 520px;
+  margin-top: 28px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  text-align: left;
+}
+.upi-screen-rate img {
+  width: min(34vw, 170px);
+  height: auto;
+  image-rendering: pixelated;
+}
+.upi-screen-rate div {
+  display: grid;
+  gap: 6px;
+}
+.upi-screen-rate strong {
+  font-size: 1.25rem;
+}
+.upi-screen-rate strong i {
+  color: #f2a516;
+}
+.upi-screen-rate span {
+  color: var(--ink-2);
 }
 
 /* ============ 18. Small phones (under 375px wide, e.g. 320 / 360) ============ */

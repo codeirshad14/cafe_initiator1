@@ -19,7 +19,7 @@
             <tr{% if b.status == "CANCELLED" %} class="row-cancelled"{% endif %}>
                 <td class="cell-main"><a href="{% url 'billing:bill_detail' b.pk %}"><strong>#{{ b.bill_no }}</strong></a></td>
                 <td data-label="Date">{{ b.bill_date|date:"d M Y" }}<br><small class="text-body-secondary">{{ b.created_at|time:"h:i A" }}</small></td>
-                <td data-label="Table">{{ b.order.place_label }}</td>
+                <td data-label="Table">{{ b.place_label }}</td>
                 <td data-label="Guest">{{ b.order.customer_name }}</td>
                 <td data-label="Amount" class="num"><strong>{{ b.grand_total|inr }}</strong></td>
                 <td data-label="Paid" class="num">{{ b.paid_amount|inr }}</td>

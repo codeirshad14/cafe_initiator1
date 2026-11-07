@@ -219,13 +219,21 @@ def table_order_context(request, table, order=None):
         poll_url = reverse("orders:floor_order", args=[order.pk])
     else:
         poll_url = reverse("orders:floor_table", args=[table.pk]) + (f"?order={order.pk}" if order else "")
+    # two or more open orders here (the same people ordered twice): "Bill all together"
+    open_here = [o for o in table_orders if o.status == Order.Status.OPEN]
+    bill_together_url = ""
+    if role in BILLING_ROLES and len(open_here) > 1 and not table.is_takeaway:
+        first, *others = open_here
+        bill_together_url = reverse("billing:bill_create", args=[first.pk]) + "?" + "&".join(
+            f"join={other.pk}" for other in others)
     return {
         "table": table,
         "order": order,
         "table_orders": table_orders,
         "kots": kots,
         "total": order_total(kots),
-        "bill": Bill.objects.filter(order=order).first() if order else None,
+        # its own bill, or the one it is billed together on (another order's, maybe another table's)
+        "bill": (Bill.objects.filter(order=order).first() or order.joined_bill) if order else None,
         "can_bill": role in BILLING_ROLES,
         "can_view_bill": role in roles.BILL_VIEW,  # the waiter: sees the bill's amount
         # a parcel is one order: new rounds only for dine-in tables
@@ -233,6 +241,8 @@ def table_order_context(request, table, order=None):
         "can_cancel": role in roles.CANCEL and order is not None and order.status in Order.CANCELLABLE,
         "can_print": role in roles.PRINT_KOT,
         "poll_url": poll_url,  # the live block asks this address again every 10 seconds
+        "bill_together_url": bill_together_url,
+        "open_here": len(open_here),
     }
 
 
@@ -276,6 +286,9 @@ def order_cancel(request, order_id):
     blocked = ""
     if order.status not in Order.CANCELLABLE:
         blocked = f"Order #{order.order_no} is {order.get_status_display().lower()}, so it cannot be cancelled here."
+    elif order.joined_bill_id:  # its dishes are on another order's bill
+        blocked = (f"Order #{order.order_no} is billed together on Bill #{order.joined_bill.bill_no}. "
+                   f"Reopen or cancel that bill first.")
     elif bill and bill.payments.exists():
         blocked = f"Bill #{bill.bill_no} already has payments. Remove them on the bill first, then cancel."
 
