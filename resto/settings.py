@@ -274,5 +274,11 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
         "django": {"handlers": ["console"], "level": config("LOG_LEVEL", default="WARNING")},
+        # resto/startup.py (database / static files brought up to date at start), resto/storage.py
+        "resto": {"handlers": ["console"], "level": "INFO"},
     },
 }
+
+# the server: at each start, apply new migrations and collect new static files first
+# (resto/startup.py), so a "git pull" + restart never ends in error 500. False: by hand only.
+AUTO_UPDATE = config("AUTO_UPDATE", default=True, cast=bool)

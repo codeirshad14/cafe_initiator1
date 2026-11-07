@@ -8,7 +8,7 @@ data-call-*: the newest call, so static/js/app.js (part 11) rings once and pops 
 {% load money %}
 <div class="dropdown notify" id="notifyBell" hx-get="{% url 'orders:notification_bell' %}" hx-swap="outerHTML"
      hx-trigger="liveChanged from:body [!document.querySelector('#notifyBell .dropdown-menu.show')], bellCheck from:body, every 60s [!document.querySelector('#notifyBell .dropdown-menu.show')]"
-     data-call-id="{{ latest_call.pk|default:0 }}"{% if latest_call %} data-call-text="{{ latest_call.table.label }}: {{ latest_call.get_reason_display }}"{% endif %}>
+     data-call-id="{{ latest_call.pk|default:0 }}"{% if latest_call %} data-call-text="{{ latest_call.call_place }}: {{ latest_call.get_reason_display }}"{% endif %}>
     <button class="icon-btn notify-btn{% if unread_count %} has-new{% endif %}{% if latest_call %} has-call{% endif %}" type="button" data-bs-toggle="dropdown"
             data-bs-auto-close="outside" aria-expanded="false"
             aria-label="Notifications{% if unread_count %}: {{ unread_count }} new{% endif %}">
@@ -38,8 +38,8 @@ data-call-*: the newest call, so static/js/app.js (part 11) rings once and pops 
                 <button type="submit" class="notify-item notify-item--call">
                     <span class="notify-icon notify-icon--call" aria-hidden="true"><i class="bi bi-bell-fill"></i></span>
                     <span class="notify-text">
-                        <strong>{{ n.table.label }} is calling</strong>
-                        <small>{{ n.get_reason_display }}{% if n.table.section %} · {{ n.table.section }}{% endif %}</small>
+                        <strong>{{ n.call_place }} is calling</strong>
+                        <small>{{ n.get_reason_display }}{% if n.table.section %} · {{ n.table.section }}{% endif %}{% if not n.table_id and n.order %} · {{ n.order.customer_name }}{% if n.order.customer_phone %} · {{ n.order.customer_phone }}{% endif %}{% endif %}</small>
                         <small class="notify-time">{% if n.minutes < 1 %}Just now{% else %}{{ n.minutes|duration }} ago{% endif %} · {{ n.created_at|time:"h:i A" }}</small>
                     </span>
                 </button>

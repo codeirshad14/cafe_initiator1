@@ -10,7 +10,8 @@ Guest pages (no login). Staff screens are in staff_views.py and delivery_views.p
   cart_put / cart_add / cart_remove            HTMX: change the cart (kept in the session)
   cart_view          /m/<qr_token>/cart/       the cart, the order type, which bill, the details
   order_place        POST                      the cart becomes a KOT (services.place_kot)
-  call_waiter        POST /m/<qr_token>/call/  the guest's bell: the waiter comes to the table
+  call_waiter        POST /m/<qr_token>/call/  "Call waiter" from a table's menu: to that table
+  call_about_order   POST /track/<token>/call/ "Call waiter" / "Need help?" about an order (any type)
   order_track        /track/<token>/           the order's live status (and, once billed,
                                                "Rate your visit": web.views.order_feedback)
   order_track_lookup /m/<qr_token>/track/      find a recent order by its number
@@ -116,6 +117,7 @@ def render_view_only_menu(request, restaurant):
     return render(request, "orders/menu.html", {
         "restaurant": restaurant, "categories": categories, "ordering": False,
         "featured": featured_dish(categories), **menu_facts(categories),
+        "call": phone_call_sheet(),  # just looking: "Need help?" calls the cafe
     })
 
 
@@ -218,8 +220,14 @@ def render_menu(request, table):
         **menu_facts(categories),
         "cart": cart_details(request, table),
         "my_order": my_running_order(request, table),
-        "can_call": can_call_waiter(table),  # the bell: call the waiter to this table
     }
+    # "Call waiter" / "Need help?" (always there): the table; else this phone's order; else the phone
+    if can_call_waiter(table):
+        context["call"] = table_call_sheet(table)
+    elif context["my_order"] is not None:
+        context["call"] = order_call_sheet(context["my_order"])
+    else:
+        context["call"] = phone_call_sheet()
     if table.is_takeaway:
         types = public_order_types(table)
         wanted = request.GET.get("type", "")
@@ -422,6 +430,19 @@ def order_place(request, table):
 
 
 # ================================================================ the guest's bell
+# "Call waiter" / "Need help?" is on every guest menu (a floating button) and order page,
+# opening orders/_call_waiter.html. Where it goes depends on where the guest is:
+#   a table's QR menu        -> that table               (call_waiter)
+#   an order (status page, or the public menu once ordered) -> about that order
+#                               (call_about_order): its table, else "Take away #216"
+#   no order yet on the public menu -> the cafe's phone number (nothing to point staff to)
+
+Reason = Notification.Reason
+TABLE_CALLS = [Reason.CALL, Reason.WATER, Reason.BILL]
+ORDER_CALLS = [Reason.HELP, Reason.STATUS, Reason.CALLBACK]
+CALL_ICONS = {Reason.CALL: "person-raised-hand", Reason.WATER: "cup-straw", Reason.BILL: "receipt",
+              Reason.HELP: "question-circle", Reason.STATUS: "clock-history", Reason.CALLBACK: "telephone-inbound"}
+
 
 def can_call_waiter(table):
     """The bell is for a real dining table: staff know where to go. Not the counter
@@ -429,20 +450,84 @@ def can_call_waiter(table):
     return not table.is_takeaway and not table.is_common
 
 
+def order_call_reasons(order):
+    """At a table (or the Common table): waiter, water, bill. A take-away or delivery: help,
+    how long, call me (only with a mobile to call)."""
+    if not order.is_parcel:
+        return TABLE_CALLS
+    return [reason for reason in ORDER_CALLS if reason != Reason.CALLBACK or order.customer_phone]
+
+
+def call_sheet(url=None, reasons=(), title="Need help?", subtitle="", button="Need help?"):
+    """What orders/_call_waiter.html and the floating button need. No url: the phone only."""
+    return {"url": url, "title": title, "subtitle": subtitle, "button": button,
+            "options": [(reason.value, reason.label, CALL_ICONS[reason]) for reason in reasons]}
+
+
+def table_call_sheet(table):
+    return call_sheet(reverse("orders:call_waiter", args=[table.qr_token]), TABLE_CALLS, "Call the waiter",
+                      f"To {table.label}. What do you need?", "Call waiter")
+
+
+def order_call_sheet(order):
+    """About this order: to its table (dine in), or the order itself (a parcel, the Common table)."""
+    table = services.table_to_walk_to(order)
+    reasons = order_call_reasons(order)
+    url = reverse("orders:call_about_order", args=[order.public_token])
+    if table is not None:
+        return call_sheet(url, reasons, "Call the waiter", f"To {table.label}. What do you need?", "Call waiter")
+    if not order.is_parcel:  # the Common table: staff find them by the order
+        return call_sheet(url, reasons, "Call the waiter", f"For your order #{order.order_no}. What do you need?",
+                          "Call waiter")
+    return call_sheet(url, reasons, "Need help?", f"About your order #{order.order_no}. What do you need?")
+
+
+def phone_call_sheet():
+    """No order yet (just looking at the menu): call the cafe."""
+    return call_sheet(subtitle="Call us, or ask at the counter. Once you order, you can call us from here too.")
+
+
+def call_done(request, called, reason, where):
+    return render(request, "orders/_call_waiter_done.html", {
+        "called": called, "reason": Reason(reason).label, "where": where,
+    })
+
+
 @require_POST
 @with_customer_table
 def call_waiter(request, table):
-    """HTMX, the bell on the table's QR menu or order page: "Call waiter", "Water please"
-    or "Bring the bill". The Floor staff's bells ring once with the table's name."""
+    """HTMX, from a table's QR menu: "Call waiter", "Water please" or "Bring the bill".
+    The Floor staff's bells ring once with the table's name."""
     if not can_call_waiter(table):
         return HttpResponse(status=404)
     reason = request.POST.get("reason", "")
-    if reason not in Notification.Reason.values:
-        reason = Notification.Reason.CALL
+    if reason not in TABLE_CALLS:
+        reason = Reason.CALL
     call = services.call_waiter(table, reason, my_running_order(request, table))
-    return render(request, "orders/_call_waiter_done.html", {
-        "table": table, "called": call is not None, "reason": Notification.Reason(reason).label,
-    })
+    return call_done(request, call is not None, reason, f"Someone is coming to {table.label}.")
+
+
+@require_POST
+def call_about_order(request, public_token):
+    """HTMX, from the order's status page or the public menu: a call about this order. At a
+    table it goes to the table; a take-away, a delivery or the Common table: to the order
+    ("Take away #216: How long for my order?")."""
+    order = get_object_or_404(Order.objects.select_related("restaurant", "table", "location"), public_token=public_token)
+    if not order.is_live or not order.restaurant.is_usable():
+        return HttpResponse(status=404)
+    reasons = order_call_reasons(order)
+    reason = request.POST.get("reason", "")
+    if reason not in reasons:
+        reason = reasons[0]
+    table = services.table_to_walk_to(order)
+    call = services.call_waiter(table, reason, order)
+    if table is not None:
+        where = f"Someone is coming to {table.label}."
+    elif reason == Reason.CALLBACK:
+        where = f"We will call {order.customer_phone} shortly."
+    else:
+        where = f"We have your message about order #{order.order_no}."
+    return call_done(request, call is not None, reason, where)
 
 
 # ================================================================ tracking
@@ -475,11 +560,8 @@ def order_track(request, public_token):
             order.status == Order.Status.OPEN and not order.is_parcel and order.table is not None
             and order.table.is_active and order.restaurant.is_usable()
         ),
-        # the bell while the guests are still at their table
-        "call_table": order.table if (
-            order.is_running and not order.is_parcel and order.table is not None
-            and order.table.is_active and can_call_waiter(order.table)
-        ) else None,
+        # "Call waiter" / "Need help?" while the order is going on (every order type)
+        "call": order_call_sheet(order) if order.is_live and order.restaurant.is_usable() else None,
         # once the bill is made: "Rate your visit" (web.views.order_feedback), or their stars
         "feedback": Feedback.objects.filter(order=order).first() if bill else None,
     }

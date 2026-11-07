@@ -1026,3 +1026,73 @@ class ServerUpdateSafetyTests(TestCase):
         self.assertIn("static file(s) not collected yet", text)
         for url in ("/", "/login/", "/manifest.webmanifest", "/sw.js", "/offline/"):
             self.assertIn(f"OK    {url} opens", text)
+
+
+class StartUpToDateTests(TestCase):
+    """resto/startup.py: on the server each start applies new migrations (before any page)
+    and collects new static files (in the background); never in development."""
+
+    def test_new_migrations_are_applied_before_the_first_page(self):
+        from unittest import mock
+        from django.test import override_settings
+        from resto import startup
+        with override_settings(DEBUG=False), \
+                mock.patch.object(startup, "migrations_to_apply", return_value=["orders.0008_bill_together"]), \
+                mock.patch.object(startup, "static_to_collect", return_value=[]), \
+                mock.patch("django.core.management.call_command") as command:
+            startup.bring_up_to_date()
+        command.assert_called_once_with("migrate", interactive=False, verbosity=0)
+
+    def test_new_static_files_are_collected_in_the_background(self):
+        from unittest import mock
+        from django.test import override_settings
+        from resto import startup
+        with override_settings(DEBUG=False), \
+                mock.patch.object(startup, "migrations_to_apply", return_value=[]), \
+                mock.patch.object(startup, "static_to_collect", return_value=["js/install.js"]), \
+                mock.patch("django.core.management.call_command") as command:
+            startup.bring_up_to_date()
+            for thread in __import__("threading").enumerate():
+                if thread.name == "mrcafe-collectstatic":
+                    thread.join(10)
+        command.assert_called_once_with("collectstatic", interactive=False, verbosity=0)
+
+    def test_a_failure_is_logged_and_the_app_still_starts(self):
+        from unittest import mock
+        from django.test import override_settings
+        from resto import startup
+        with override_settings(DEBUG=False), \
+                mock.patch.object(startup, "migrations_to_apply", side_effect=RuntimeError("db down")), \
+                mock.patch.object(startup, "static_to_collect", return_value=[]), \
+                self.assertLogs("resto.startup", "ERROR") as log:
+            startup.bring_up_to_date()  # no exception
+        self.assertIn("deploy/update.sh", log.output[0])
+
+    def test_nothing_in_development_or_when_switched_off(self):
+        from unittest import mock
+        from django.test import override_settings
+        from resto import startup
+        for settings in ({"DEBUG": True}, {"DEBUG": False, "AUTO_UPDATE": False}):
+            with self.subTest(**settings), override_settings(**settings), \
+                    mock.patch.object(startup, "update_database") as database:
+                startup.bring_up_to_date()
+                database.assert_not_called()
+
+    def test_the_app_uses_a_new_collectstatic_without_a_restart(self):
+        import json
+        import os
+        import tempfile
+        from unittest import mock
+        from resto import storage as storage_module
+        from resto.storage import FingerprintedStaticStorage
+        root = tempfile.mkdtemp(prefix="resto-static-")
+        manifest = os.path.join(root, "staticfiles.json")
+        with open(manifest, "w") as file:
+            json.dump({"version": "1.1", "paths": {"css/app.css": "css/app.old111.css"}}, file)
+        storage = FingerprintedStaticStorage(location=root, base_url="/static/")
+        self.assertEqual(storage.url("css/app.css"), "/static/css/app.old111.css")
+        with open(manifest, "w") as file:  # collectstatic ran again (another worker)
+            json.dump({"version": "1.1", "paths": {"css/app.css": "css/app.new222.css"}}, file)
+        os.utime(manifest, (os.path.getatime(manifest), os.path.getmtime(manifest) + 5))
+        with mock.patch.object(storage_module, "LOOK_AGAIN_AFTER", 0):
+            self.assertEqual(storage.url("css/app.css"), "/static/css/app.new222.css")

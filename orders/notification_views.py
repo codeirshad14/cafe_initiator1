@@ -1,13 +1,14 @@
 """
 The bell in the top bar (every staff page) for this location:
 "New order" (made with each new order: orders.services.place_kot) and, for the Floor
-roles, a guest's call from their table's bell (orders.services.call_waiter): "Table T4:
-Water please", with a soft sound once (static/js/app.js part 11).
+roles, a guest's call (orders.services.call_waiter): from a table, "Table T4: Water please",
+or about an order, "Take away #216: How long for my order?", with a soft sound once
+(static/js/app.js part 11).
 
   notification_bell      the bell, its count of unread and the list (HTMX; it redraws
                          itself when anything changes: core/live.py)
   notification_open      open one: marked read for everyone, then its order's page
-                         (a call: its table on the Floor)
+                         (a call: its table on the Floor, or its order)
   notification_read_all  Mark all as read (for everyone)
 """
 
@@ -79,9 +80,9 @@ def notification_open(request, pk):
         note.read_at, note.read_by = timezone.now(), request.user.staff
         note.save(update_fields=["read_at", "read_by"])
         bump(note.restaurant_id)  # the other bells drop it at once
-    if note.is_call:  # going to the table that called
+    if note.is_call and note.table_id:  # going to the table that called
         return redirect("orders:floor_table", table_id=note.table_id)
-    return redirect(order_page(note.order, request.user.staff))
+    return redirect(order_page(note.order, request.user.staff))  # a call about an order: that order
 
 
 def unread_or_read(request):

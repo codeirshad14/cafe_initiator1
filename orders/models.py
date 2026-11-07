@@ -219,9 +219,11 @@ class Notification(models.Model):
     working at its location:
 
       NEW_ORDER  "New order": made with the order (services.place_kot)
-      CALL       a guest at a table pressed the bell on their QR menu ("Call waiter",
-                 "Water please", "Bring the bill"): services.call_waiter. Only the
-                 Floor roles see it, with a soft sound once.
+      CALL       a guest pressed "Call waiter" / "Need help?" (services.call_waiter): from a
+                 table ("Table T4: Water please"), or about their order when there is no
+                 table to walk to: a take-away, a delivery, the Common table ("Take away
+                 #216: How long for my order?"). Only the Floor roles see it, with a soft
+                 sound once.
 
     Read once means read for all: when one person opens it (or Mark all as read),
     it has been seen to, so it leaves every bell.
@@ -232,9 +234,12 @@ class Notification(models.Model):
         CALL = "CALL", "Waiter call"
 
     class Reason(models.TextChoices):  # what a guest's call is for
-        CALL = "CALL", "Call waiter"
+        CALL = "CALL", "Call waiter"      # at a table
         WATER = "WATER", "Water please"
         BILL = "BILL", "Bring the bill"
+        HELP = "HELP", "Need help"        # a take-away or delivery
+        STATUS = "STATUS", "How long for my order?"
+        CALLBACK = "CALLBACK", "Please call me"
 
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name="notifications")
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name="notifications")
@@ -252,9 +257,22 @@ class Notification(models.Model):
 
     def __str__(self):
         if self.is_call:
-            return f"{self.table.label}: {self.get_reason_display()}"
+            return f"{self.call_place}: {self.get_reason_display()}"
         return f"New order #{self.order.order_no}"
 
     @property
     def is_call(self):
         return self.kind == self.Kind.CALL
+
+    @property
+    def call_place(self):
+        """Where a call comes from: "Table T4", or its order: "Take away #216", "Delivery #217",
+        "Common table #215"."""
+        if self.table_id:
+            return self.table.label
+        order = self.order
+        if order.is_parcel or not order.table_id:
+            place = order.place_label if order.is_parcel else "Dine in"
+        else:  # the Common table says its own name ("Common table", not "Table Common table")
+            place = order.table.name if order.table.is_common else order.table.label
+        return f"{place} #{order.order_no}"

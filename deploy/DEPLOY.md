@@ -184,6 +184,11 @@ It also makes **every later update automatic**:
   leave new code on an old database, the cause of every error 500 after an update;
 - a `git pull` that brings new code restarts the service by itself (`.git/hooks/post-merge`).
 
+The app itself does it too, even without that one run (`resto/startup.py`): when it starts
+on the server it applies any new migration before serving a page, and collects new static
+files in the background (the log says so: `journalctl -u <service>`). `AUTO_UPDATE=False`
+in `.env` switches that off.
+
 So after that one run, an update is just:
 
 ```bash

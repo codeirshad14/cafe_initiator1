@@ -26,6 +26,7 @@ urlpatterns = [
     path("m/<uuid:qr_token>/track/", guest_views.order_track_lookup, name="order_track_lookup"),
     path("m/<uuid:qr_token>/call/", guest_views.call_waiter, name="call_waiter"),
     path("track/<uuid:public_token>/", guest_views.order_track, name="order_track"),
+    path("track/<uuid:public_token>/call/", guest_views.call_about_order, name="call_about_order"),
 
     # staff: floor and tables
     path("floor/", staff_views.floor, name="floor"),

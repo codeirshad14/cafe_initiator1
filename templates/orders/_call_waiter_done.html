@@ -1,11 +1,11 @@
-{# after the guest pressed the bell (orders.guest_views.call_waiter): in place of the three choices #}
+{# after the guest pressed a choice (orders.guest_views.call_waiter / call_about_order): in place of the choices #}
 <div class="call-sheet-done" role="status">
     <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
     {% if called %}
     <strong>{{ reason }}: sent</strong>
-    <span>Someone is coming to {{ table.label }}.</span>
+    <span>{{ where }}</span>
     {% else %}
-    <strong>The waiter is already called</strong>
-    <span>Someone is on the way to {{ table.label }}. You can call again in a moment.</span>
+    <strong>Already sent</strong>
+    <span>{{ where }} You can send again in a moment.</span>
     {% endif %}
 </div>

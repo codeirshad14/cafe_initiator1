@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from core.testing import HTMX, client_for, guest_orders, make_menu, make_restaurant, make_staff, make_table
 from orders.models import KOT, Order
@@ -983,7 +984,11 @@ class WaiterCallTests(TestCase):
         track = guest.get(f"/track/{Order.objects.get().public_token}/")
         self.assertContains(track, "Need anything? Call the waiter")
         # the public menu (parcels) has no bell: no table to walk to
-        self.assertNotContains(Client().get(f"/r/{self.restaurant.slug}/"), 'data-open-dialog="callWaiter"')
+        # the public menu before any order: "Need help?" offers the cafe's phone (nothing to point staff to)
+        public = Client().get(f"/r/{self.restaurant.slug}/")
+        self.assertContains(public, 'class="gm-call-fab"')
+        self.assertContains(public, 'href="tel:9876500000"')
+        self.assertNotContains(public, 'class="call-sheet-options"')  # the phone only
 
     def test_a_call_rings_once_for_the_floor_with_the_table(self):
         from orders.models import Notification
@@ -994,7 +999,7 @@ class WaiterCallTests(TestCase):
         self.assertEqual((call.kind, call.table, call.reason, call.read_at), ("CALL", self.table, "WATER", None))
 
         again = guest.post(self.call_url, {"reason": "CALL"}, **HTMX)  # pressed again at once: no second ring
-        self.assertContains(again, "already called")
+        self.assertContains(again, "Already sent")
         self.assertEqual(Notification.objects.count(), 1)
 
         bell = self.waiter.get("/notifications/")
@@ -1019,3 +1024,95 @@ class WaiterCallTests(TestCase):
         for table in (takeaway_table(self.restaurant), common_table(self.restaurant, self.table.location)):
             with self.subTest(table=table.name):
                 self.assertEqual(Client().post(f"/m/{table.qr_token}/call/", **HTMX).status_code, 404)
+
+
+class CallFromEveryMenuTests(TestCase):
+    """"Call waiter" / "Need help?" on every guest menu and order page: a table's call goes to
+    the table; take-away, delivery and the Common table call about their order."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant(delivery_enabled=True)
+        _, self.paneer, _ = make_menu(self.restaurant)
+        self.public = f"/r/{self.restaurant.slug}/"
+        self.waiter = client_for(make_staff(self.restaurant, "WAITER"))
+
+    def order_on_public_menu(self, order_type, **details):
+        from tables.models import takeaway_table
+        counter = takeaway_table(self.restaurant)
+        guest = Client()
+        guest.get(self.public)
+        guest.post(f"/m/{counter.qr_token}/cart/add/{self.paneer.pk}/", **HTMX)
+        guest.post(f"/m/{counter.qr_token}/place/", {"order_type": order_type, "customer_name": "Meera", **details})
+        return Order.objects.latest("pk"), guest
+
+    def test_every_menu_has_the_button(self):
+        table = make_table(self.restaurant, "T4")
+        for url in (f"/m/{table.qr_token}/", self.public, f"{self.public}view/"):
+            with self.subTest(url=url):
+                page = Client().get(url)
+                self.assertContains(page, 'class="gm-call-fab"')
+                self.assertContains(page, 'id="callWaiter"')
+
+    def test_take_away_asks_about_its_order(self):
+        from orders.models import Notification
+        order, guest = self.order_on_public_menu("TAKEAWAY")
+        self.assertEqual(order.order_type, "TAKEAWAY")
+        track = guest.get(f"/track/{order.public_token}/")
+        self.assertContains(track, "Need help with your order?")
+        self.assertContains(track, f'hx-post="/track/{order.public_token}/call/"')
+        self.assertContains(track, "How long for my order?")
+        self.assertNotContains(track, "Please call me")  # no mobile given: nobody to call back
+        menu = guest.get(self.public)  # back on the public menu: the button is about this order now
+        self.assertContains(menu, f'hx-post="/track/{order.public_token}/call/"')
+
+        sent = guest.post(f"/track/{order.public_token}/call/", {"reason": "STATUS"}, **HTMX)
+        self.assertContains(sent, "How long for my order?: sent")
+        self.assertContains(sent, f"We have your message about order #{order.order_no}.")
+        call = Notification.objects.get(kind="CALL")
+        self.assertEqual((call.table, call.order, call.reason, call.call_place),
+                         (None, order, "STATUS", f"Take away #{order.order_no}"))
+        self.assertContains(guest.post(f"/track/{order.public_token}/call/", {"reason": "HELP"}, **HTMX), "Already sent")
+
+        bell = self.waiter.get("/notifications/")
+        self.assertContains(bell, f"Take away #{order.order_no} is calling")
+        self.assertContains(bell, f'data-call-text="Take away #{order.order_no}: How long for my order?"')
+        opened = self.waiter.post(f"/notifications/{call.pk}/open/")
+        self.assertRedirects(opened, f"/floor/order/{order.pk}/", fetch_redirect_response=False)
+
+    def test_delivery_can_ask_for_a_call_back(self):
+        from orders.models import Notification
+        order, guest = self.order_on_public_menu("DELIVERY", customer_phone="9876500077", customer_address="1 Lake Road")
+        self.assertEqual(order.order_type, "DELIVERY")
+        track = guest.get(f"/track/{order.public_token}/")
+        self.assertContains(track, "Please call me")
+        sent = guest.post(f"/track/{order.public_token}/call/", {"reason": "CALLBACK"}, **HTMX)
+        self.assertContains(sent, "We will call 9876500077 shortly.")
+        self.assertContains(self.waiter.get("/notifications/"), "9876500077")
+        self.assertEqual(Notification.objects.get(kind="CALL").call_place, f"Delivery #{order.order_no}")
+        # a reason that is not offered here (water for a delivery): the first choice instead
+        Notification.objects.update(read_at=timezone.now())
+        guest.post(f"/track/{order.public_token}/call/", {"reason": "WATER"}, **HTMX)
+        self.assertEqual(Notification.objects.filter(kind="CALL").latest("pk").reason, "HELP")
+
+    def test_common_table_calls_with_the_order(self):
+        from orders.models import Notification
+        order, guest = self.order_on_public_menu("DINE_IN")
+        self.assertTrue(order.table.is_common)
+        guest.post(f"/track/{order.public_token}/call/", {"reason": "WATER"}, **HTMX)
+        self.assertEqual(Notification.objects.get(kind="CALL").call_place, f"Common table #{order.order_no}")
+
+    def test_a_dine_in_order_page_calls_its_table(self):
+        from orders.models import Notification
+        table = make_table(self.restaurant, "T9")
+        guest = Client()
+        guest_orders(guest, table, [self.paneer])
+        order = Order.objects.get(table=table)
+        sent = guest.post(f"/track/{order.public_token}/call/", {"reason": "BILL"}, **HTMX)
+        self.assertContains(sent, "Someone is coming to Table T9.")
+        self.assertEqual(Notification.objects.get(kind="CALL").table, table)
+
+    def test_no_calls_once_the_order_is_over(self):
+        order, guest = self.order_on_public_menu("TAKEAWAY")
+        Order.objects.filter(pk=order.pk).update(status="CLOSED")
+        self.assertNotContains(guest.get(f"/track/{order.public_token}/"), "Need help with your order?")
+        self.assertEqual(guest.post(f"/track/{order.public_token}/call/", {"reason": "HELP"}, **HTMX).status_code, 404)

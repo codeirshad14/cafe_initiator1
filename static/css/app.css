@@ -10655,6 +10655,46 @@ a.ceo-kpi:hover {
 .c-call {
   margin-top: 12px;
 }
+/* every guest menu: "Call waiter" / "Need help?" floating at the bottom right, above the
+   cart bar when there is one (orders/_call_button.html) */
+.gm-call-fab {
+  position: fixed;
+  right: max(14px, calc(50vw - 228px));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 31;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 16px 0 14px;
+  border: 1px solid #f6d58b;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #92400e;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(146, 64, 14, 0.22);
+  transition: bottom 0.2s var(--ease);
+}
+.gm-call-fab i {
+  color: #d97706;
+  font-size: 1.05rem;
+}
+.gm-call-fab:hover,
+.gm-call-fab:focus-visible {
+  background: #fdecc8;
+}
+body:has(.cart-bar) .gm-call-fab {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+.call-phone {
+  margin-bottom: 8px;
+}
+.call-sheet-note {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+  text-align: center;
+}
 .c-call i {
   color: #b45309;
 }
@@ -10700,7 +10740,8 @@ a.ceo-kpi:hover {
 }
 .call-sheet-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-columns: minmax(0, 1fr);  /* 2 or 3 choices: equal, filling the row */
+  grid-auto-flow: column;
   gap: 8px;
   margin-bottom: 14px;
 }

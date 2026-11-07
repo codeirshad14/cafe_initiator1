@@ -189,23 +189,36 @@ def place_kot(table, lines, customer_name, customer_phone="", note="", source=Or
 CALL_AGAIN_AFTER = timedelta(minutes=2)  # a second press before this, while nobody answered: no new ring
 
 
-def call_waiter(table, reason=Notification.Reason.CALL, order=None):
-    """A guest at a dining table pressed the bell on their QR menu: the Floor staff's
-    bells ring once (soft sound) with the table and what they want.
+def table_to_walk_to(order):
+    """The dining table staff walk to for this order, or None (a parcel, the Common table)."""
+    table = order.table
+    if order.is_parcel or table is None or table.is_takeaway or table.is_common:
+        return None
+    return table
 
-    Returns the call, or None when this table already called in the last 2 minutes
-    and nobody has answered it yet (one ring is enough; no ringing on and on)."""
+
+def call_waiter(table=None, reason=Notification.Reason.CALL, order=None):
+    """A guest pressed "Call waiter" / "Need help?": the Floor staff's bells ring once (soft
+    sound) with where it comes from and what they want.
+
+    table  a dining table (its QR menu, or a dine-in order there): "Table T4: Water please"
+    order  the guest's order; with no table (a take-away, a delivery, the Common table)
+           the call is about it: "Take away #216: How long for my order?"
+
+    Returns the call, or None when the same table (or order) already called in the last
+    2 minutes and nobody has answered it yet (one ring is enough; no ringing on and on)."""
+    where = {"table": table} if table is not None else {"order": order, "table__isnull": True}
     waiting = Notification.objects.filter(
-        table=table, kind=Notification.Kind.CALL, read_at__isnull=True,
-        created_at__gte=timezone.now() - CALL_AGAIN_AFTER,
+        kind=Notification.Kind.CALL, read_at__isnull=True, created_at__gte=timezone.now() - CALL_AGAIN_AFTER, **where,
     )
     if waiting.exists():
         return None
+    source = table if table is not None else order
     call = Notification.objects.create(
-        restaurant=table.restaurant, location=table.location, kind=Notification.Kind.CALL,
+        restaurant=source.restaurant, location=source.location, kind=Notification.Kind.CALL,
         table=table, order=order, reason=reason,
     )
-    bump(table.restaurant_id)  # every staff screen's bell asks again at once
+    bump(source.restaurant_id)  # every staff screen's bell asks again at once
     return call
 
 
