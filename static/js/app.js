@@ -20,6 +20,10 @@
       device when the app is in the background
   12. Sheets: a button opens a <dialog>; its part      data-open-dialog="id", data-reset-on-close
       comes back as it was when closed
+  13. Back shows a page closed: the phone's menu        #sidebar (drawer), side panel, dropdowns, sheets
+      drawer shuts when one of its links is tapped,
+      and a page brought back by Back never shows
+      the drawer (or a panel) still open
 
 
    The server talks to this file through the HX-Trigger header, e.g.
@@ -298,13 +302,16 @@
   }
 
   /* -------------------------------------------- 11. a guest's call */
-  // The bell (orders/_notification_bell.html) carries its newest unread call. A call
+  // The bell (orders/_notification_bell.html) carries its newest unread call. A NEW call
   // this device has not rung for yet: a soft two-note chime once, a message with the
   // table, and (installed app or browser in the background) a pop-up on the device.
-  // The number rung last is kept on the device, so every other tab stays quiet.
+  // Only new ones: a call older than FRESH_CALL seconds is in the bell's list but never
+  // rings. The number rung last is kept on the device, in a cookie (it works wherever the
+  // login works) and in local storage, so other pages and tabs never ring it again.
   const HEARD_KEY = "resto-call-heard";
+  const FRESH_CALL = 120;
   let audio = null;
-  let heardHere = 0;  // when the device's storage is off
+  let heardHere = 0;  // this page, whatever the device keeps
 
   function wakeSound() {
     // browsers allow sound only after a tap on the page: get it ready at the first one
@@ -335,16 +342,16 @@
   }
 
   function lastHeard() {
-    try {
-      return parseInt(localStorage.getItem(HEARD_KEY) || "0", 10) || 0;
-    } catch (e) {
-      return heardHere;
-    }
+    let kept = 0;
+    try { kept = parseInt(localStorage.getItem(HEARD_KEY) || "0", 10) || 0; } catch (e) {}
+    const cookie = document.cookie.match(/(?:^|;\s*)resto-call-heard=(\d+)/);
+    return Math.max(heardHere, kept, cookie ? parseInt(cookie[1], 10) : 0);
   }
 
   function rememberHeard(id) {
     heardHere = id;
     try { localStorage.setItem(HEARD_KEY, String(id)); } catch (e) {}
+    document.cookie = HEARD_KEY + "=" + id + "; path=/; max-age=86400; SameSite=Lax";
   }
 
   function popUp(text) {
@@ -368,6 +375,7 @@
     const id = bell ? parseInt(bell.dataset.callId || "0", 10) || 0 : 0;
     if (!id || id <= lastHeard()) return;
     rememberHeard(id);
+    if ((parseInt(bell.dataset.callAge || "0", 10) || 0) > FRESH_CALL) return;  // an old call: in the list, no ring
     const text = bell.dataset.callText || "A table is calling";
     chime();
     showMessage(text, "warning");
@@ -418,6 +426,68 @@
       part.innerHTML = original;
       if (window.htmx) htmx.process(part);
     });
+  });
+
+  /* --------------------------------------------- 13. Back shows a page closed */
+  // The browser keeps the page it leaves as it is, to show it again on Back. Left with
+  // the phone's menu drawer (or a panel, a dropdown) open, it would come back open and
+  // then visibly snap shut. So:
+  //   - a tap on a drawer link slides the drawer shut while the next screen loads;
+  //   - when the page is left, and when Back shows it again, everything still open is
+  //     closed AT ONCE, with no animation (html.no-motion, app.css section 7): the page
+  //     comes back settled, exactly as a screen should look.
+  // The page change itself is the smooth part (view transitions, app.css section 7);
+  // "back" tells it to slide in from the left.
+  const root = document.documentElement;
+
+  function closeAtOnce() {
+    root.classList.add("no-motion");
+    document.querySelectorAll(".offcanvas, .offcanvas-lg").forEach(function (drawer) {
+      if (!drawer.matches(".show, .showing, .hiding")) return;
+      const open = window.bootstrap && bootstrap.Offcanvas.getInstance(drawer);
+      if (open) open.dispose();  // made fresh by the next tap on ☰
+      drawer.classList.remove("show", "showing", "hiding");
+      drawer.removeAttribute("aria-modal");
+      drawer.removeAttribute("role");
+    });
+    document.querySelectorAll(".offcanvas-backdrop").forEach(function (backdrop) { backdrop.remove(); });
+    ["overflow", "padding-right"].forEach(function (property) { document.body.style.removeProperty(property); });
+    document.querySelectorAll(".dropdown-menu.show").forEach(function (menu) {
+      menu.classList.remove("show");
+      const toggle = menu.parentElement.querySelector('[data-bs-toggle="dropdown"]');
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll("dialog[open]").forEach(function (sheet) { sheet.close(); });
+    void root.offsetWidth;  // apply it now, without transitions
+  }
+
+  function motionBackOn() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { root.classList.remove("no-motion"); });
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    const link = event.target.closest("#sidebar a[href]");
+    if (!link || !window.bootstrap) return;
+    const drawer = bootstrap.Offcanvas.getInstance(document.getElementById("sidebar"));
+    if (drawer) drawer.hide();  // slides shut while the next screen loads
+  });
+
+  window.addEventListener("pagehide", closeAtOnce);  // left settled in the browser's page cache
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) closeAtOnce();  // shown again by Back: settled from the first frame
+    motionBackOn();
+  });
+
+  // the page change: a Back (the top bar's or the phone's) slides in from the left
+  window.addEventListener("pagereveal", function (event) {
+    if (!event.viewTransition || !window.navigation || !navigation.activation) return;
+    const activation = navigation.activation;
+    if (activation.navigationType === "traverse" && activation.from && activation.entry
+        && activation.entry.index < activation.from.index) {
+      event.viewTransition.types.add("back");
+    }
   });
 
 })();

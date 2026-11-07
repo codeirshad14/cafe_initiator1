@@ -1096,3 +1096,83 @@ class StartUpToDateTests(TestCase):
         os.utime(manifest, (os.path.getatime(manifest), os.path.getmtime(manifest) + 5))
         with mock.patch.object(storage_module, "LOOK_AGAIN_AFTER", 0):
             self.assertEqual(storage.url("css/app.css"), "/static/css/app.new222.css")
+
+
+class BackButtonTests(TestCase):
+    """Every page has a way back, and nothing closes the installed app: the print pages'
+    Close is now Back (to the bill / the table) and Home (partials/_go_back.html)."""
+
+    def setUp(self):
+        from core.testing import guest_orders, make_menu, make_table
+        from orders.models import Order
+        self.restaurant = make_restaurant()
+        _, self.paneer, _ = make_menu(self.restaurant)
+        self.table = make_table(self.restaurant)
+        self.guest = Client()
+        guest_orders(self.guest, self.table, [self.paneer])
+        self.order = Order.objects.get()
+        self.admin = client_for(make_staff(self.restaurant, "ADMIN"))
+        self.admin.post(f"/billing/create/{self.order.pk}/", {"discount_type": "AMOUNT"})
+        from billing.models import Bill
+        self.bill = Bill.objects.get()
+
+    def test_print_pages_go_back_instead_of_closing_the_app(self):
+        kot = self.order.kots.get()
+        for url, back in ((f"/billing/{self.bill.pk}/print/", f"/billing/{self.bill.pk}/"),
+                          (f"/kot/{kot.pk}/print/", "/kitchen/")):
+            with self.subTest(url=url):
+                page = self.admin.get(url)
+                self.assertNotContains(page, "window.close()\">")  # no bare Close button any more
+                self.assertContains(page, f'href="{back}" data-go-back>&larr; Back</a>', html=False)
+                self.assertContains(page, 'data-leave>Home</a>')  # Home leaves the print page for good
+                self.assertContains(page, "Print again")
+                self.assertContains(page, 'document.addEventListener("click"')  # the Back script is there
+                # a one-time page: no Back returns to it, and stepping past it prints nothing
+                self.assertContains(page, "data-transient>")
+                self.assertContains(page, "if (!window.mrcafeCameBack) window.print();")
+                self.assertContains(page, "location.replace(")
+
+    def test_every_staff_page_has_back_in_the_top_bar(self):
+        for url in ("/dashboard/", "/floor/", f"/billing/{self.bill.pk}/", "/menu/items/", "/reports/"):
+            with self.subTest(url=url):
+                page = self.admin.get(url)
+                self.assertContains(page, 'class="icon-btn topbar-back" href="/home/" data-go-back')
+
+    def test_full_screen_pages_and_guest_pages_have_back(self):
+        pages = {
+            "/tables/qr-sheet/": 'href="/tables/" data-go-back',
+            f"/billing/{self.bill.pk}/upi/screen/": f'href="/billing/{self.bill.pk}/" data-go-back',
+        }
+        for url, back in pages.items():
+            with self.subTest(url=url):
+                self.assertContains(self.admin.get(url), back)
+        track = self.guest.get(f"/track/{self.order.public_token}/")
+        self.assertContains(track, f'href="/m/{self.table.qr_token}/" aria-label="Back"')  # also once billed
+        rate = self.guest.get(f"/feedback/{self.order.public_token}/")
+        self.assertContains(rate, f'href="/track/{self.order.public_token}/" aria-label="Back"')
+        self.assertContains(Client().get("/offline/"), "data-go-back")
+        self.table.is_active = False
+        self.table.save()
+        self.assertContains(Client().get(f"/m/{self.table.qr_token}/", follow=True), "data-go-back", status_code=404)
+
+    def test_print_links_open_in_the_same_screen_on_phones(self):
+        page = self.admin.get("/tables/")
+        self.assertContains(page, 'target="_blank" rel="noopener" data-same-window')
+        from django.contrib.staticfiles import finders  # (static files are not served in tests)
+        with open(finders.find("js/printing.js"), encoding="utf-8") as file:
+            text = file.read()
+        self.assertIn('link.target = "_self"', text)
+        self.assertIn("(display-mode: standalone)", text)
+
+    def test_back_never_shows_the_phone_menu_drawer_open(self):
+        from django.contrib.staticfiles import finders
+        with open(finders.find("js/app.js"), encoding="utf-8") as file:
+            text = file.read()
+        self.assertIn('window.addEventListener("pagehide", closeAtOnce)', text)  # left settled
+        self.assertIn("if (event.persisted) closeAtOnce();", text)  # and shown settled again by Back
+        self.assertIn('"#sidebar a[href]"', text)  # a tap on a drawer link shuts the drawer
+        self.assertIn('event.viewTransition.types.add("back")', text)  # Back slides in from the left
+        with open(finders.find("css/app.css"), encoding="utf-8") as file:
+            css = file.read()
+        self.assertIn("@view-transition", css)  # smooth page changes
+        self.assertIn("prefers-reduced-motion: reduce", css)

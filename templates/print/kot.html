@@ -7,10 +7,12 @@
     <link href="{% static 'css/app.css' %}" rel="stylesheet">
 </head>
 {# 80 mm thermal slip for the kitchen: dishes and quantities, no prices #}
-<body class="print-80">
+<body class="print-80" data-transient>
+{# Back to the page before (never closes the app: partials/_go_back.html), else the Kitchen board (all who print KOTs may open it) #}
 <div class="print-tools">
-    <button type="button" onclick="window.print()">Print again</button>
-    <button type="button" onclick="window.close()">Close</button>
+    <a class="print-tool" href="{% url 'orders:kitchen' %}" data-go-back>&larr; Back</a>
+    <button type="button" class="print-tool print-tool--main" onclick="window.print()">Print again</button>
+    <a class="print-tool" href="{% url 'core:home' %}" data-leave>Home</a>
 </div>
 
 <main class="slip">
@@ -47,9 +49,10 @@
     <div class="slip-center slip-small">Printed {% now "d-m-Y h:i A" %}</div>
 </main>
 
+{% include "partials/_go_back.html" %}
 <script>
     // print as soon as the slip has loaded
-    window.addEventListener("load", function () { window.print(); });
+    window.addEventListener("load", function () { if (!window.mrcafeCameBack) window.print(); });  // not when stepped past (partials/_go_back.html)
 </script>
 </body>
 </html>

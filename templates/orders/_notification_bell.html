@@ -1,14 +1,14 @@
 {% comment %}
 The bell in the top bar (orders/notification_views.py): new orders, and for the Floor roles
-the guests' calls from their table ("Table T4: Water please"). Opening one, or Mark all as
-read, clears it for everyone. It redraws itself when anything changes (liveChanged, core/live.py;
+the guests' calls from their table ("Table T4: Water please"), of the last 12 hours. Opening
+one, or Mark all as read, clears it for everyone. It redraws itself when anything changes (liveChanged, core/live.py;
 bellCheck while the app is in the background), but not while open.
 data-call-*: the newest call, so static/js/app.js (part 11) rings once and pops it up.
 {% endcomment %}
 {% load money %}
 <div class="dropdown notify" id="notifyBell" hx-get="{% url 'orders:notification_bell' %}" hx-swap="outerHTML"
      hx-trigger="liveChanged from:body [!document.querySelector('#notifyBell .dropdown-menu.show')], bellCheck from:body, every 60s [!document.querySelector('#notifyBell .dropdown-menu.show')]"
-     data-call-id="{{ latest_call.pk|default:0 }}"{% if latest_call %} data-call-text="{{ latest_call.call_place }}: {{ latest_call.get_reason_display }}"{% endif %}>
+     data-call-id="{{ latest_call.pk|default:0 }}"{% if latest_call %} data-call-age="{{ latest_call.age }}" data-call-text="{{ latest_call.call_place }}: {{ latest_call.get_reason_display }}"{% endif %}>
     <button class="icon-btn notify-btn{% if unread_count %} has-new{% endif %}{% if latest_call %} has-call{% endif %}" type="button" data-bs-toggle="dropdown"
             data-bs-auto-close="outside" aria-expanded="false"
             aria-label="Notifications{% if unread_count %}: {{ unread_count }} new{% endif %}">

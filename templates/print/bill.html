@@ -7,10 +7,12 @@
     <link href="{% static 'css/app.css' %}" rel="stylesheet">
 </head>
 {# 80 mm thermal bill #}
-<body class="print-80">
+<body class="print-80" data-transient>
+{# Back to the bill (never closes the app: partials/_go_back.html), Print again, Home #}
 <div class="print-tools">
-    <button type="button" onclick="window.print()">Print again</button>
-    <button type="button" onclick="window.close()">Close</button>
+    <a class="print-tool" href="{% url 'billing:bill_detail' bill.pk %}" data-go-back>&larr; Back</a>
+    <button type="button" class="print-tool print-tool--main" onclick="window.print()">Print again</button>
+    <a class="print-tool" href="{% url 'core:home' %}" data-leave>Home</a>
 </div>
 
 {# what the bill shows is set in Cafe profile > Bill & print (name, title, logo, tax lines, UPI) #}
@@ -80,8 +82,9 @@
     <div class="slip-center slip-small">Prices in &#8377;.{% if restaurant.print_tax_details %} GST included as shown above.{% endif %}</div>
 </main>
 
+{% include "partials/_go_back.html" %}
 <script>
-    window.addEventListener("load", function () { window.print(); });
+    window.addEventListener("load", function () { if (!window.mrcafeCameBack) window.print(); });  // not when stepped past (partials/_go_back.html)
 </script>
 </body>
 </html>

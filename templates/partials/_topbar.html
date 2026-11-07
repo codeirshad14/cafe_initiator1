@@ -11,7 +11,12 @@
         <i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>
     </button>
 
-    {# phones / tablets: the brand mark, like an app's header #}
+    {# Back, on every staff page: the installed app has no browser Back (partials/_go_back.html) #}
+    <a class="icon-btn topbar-back" href="{% url 'core:home' %}" data-go-back aria-label="Back" title="Back">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+    </a>
+
+    {# tablets: the brand mark, like an app's header (phones: no room next to Back) #}
     <span class="topbar-mark" aria-hidden="true"><i class="bi bi-qr-code-scan"></i></span>
 
     <div class="topbar-title">
@@ -32,9 +37,9 @@
         </div>
         {% endif %}
 
-        {# more than one location: which one this screen shows (core/locations.py) #}
+        {# more than one location: which one this screen shows (core/locations.py). Phones: in the account menu (the name line already says where) #}
         {% if my_locations %}
-        <div class="dropdown">
+        <div class="dropdown d-none d-sm-block">
             <button class="location-chip" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Location: {{ current_location.name }}. Change">
                 <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
                 <span class="truncate">{{ current_location.name }}</span>
@@ -94,6 +99,23 @@
                     </div>
                 </div>
                 <div class="dropdown-divider"></div>
+                {% if my_locations %}
+                {# phones: the location switch lives here (no room in the bar) #}
+                <div class="d-sm-none">
+                    <h6 class="dropdown-header">Work at</h6>
+                    {% for place in my_locations %}
+                    <form method="post" action="{% url 'core:switch_location' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="location" value="{{ place.pk }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="dropdown-item{% if place == current_location %} active{% endif %}"{% if place == current_location %} aria-current="true"{% endif %}>
+                            <i class="bi bi-geo-alt" aria-hidden="true"></i> {{ place.name }}
+                        </button>
+                    </form>
+                    {% endfor %}
+                    <div class="dropdown-divider"></div>
+                </div>
+                {% endif %}
                 {# phones: Install app lives here (no room in the bar); hidden once installed #}
                 <button type="button" class="dropdown-item install-menu-item d-sm-none" data-install-app hidden>
                     <i class="bi bi-download" aria-hidden="true"></i> Install app

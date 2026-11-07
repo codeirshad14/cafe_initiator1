@@ -31,14 +31,16 @@ login is known, so nothing here needs one.
         <h1>{% block heading %}{% endblock %}</h1>
         <p class="text-body-secondary">{% block message %}{% endblock %}</p>
         <div class="error-page-actions">
-            <button type="button" class="btn btn-light" onclick="history.back()">
+            {# the page before; with none (the installed app opened here): Home (partials/_go_back.html) #}
+            <a class="btn btn-light" href="{% if user.is_authenticated %}/home/{% else %}/{% endif %}" data-go-back>
                 <i class="bi bi-arrow-left" aria-hidden="true"></i> Go back
-            </button>
+            </a>
             {# staff to their own first screen, guests (and the 500 page, which knows nobody) to the website #}
             <a class="btn btn-primary" href="{% if user.is_authenticated %}/home/{% else %}/{% endif %}"><i class="bi bi-house" aria-hidden="true"></i> Home</a>
         </div>
         <p class="auth-help"><small>Error {% block code %}{% endblock %}</small></p>
     </section>
 </main>
+{% include "partials/_go_back.html" %}
 </body>
 </html>

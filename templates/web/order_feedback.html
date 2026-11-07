@@ -10,7 +10,8 @@ Once rated, it thanks them and shows their stars instead of the questions.
 {% block app_class %} gm-page{% endblock %}
 
 {% block header %}
-{% include "orders/_customer_header.html" with title="Rate your visit" subtitle=subtitle %}
+{% url 'orders:order_track' order.public_token as order_url %}
+{% include "orders/_customer_header.html" with back_url=order_url title="Rate your visit" subtitle=subtitle %}
 {% endblock %}
 
 {% block content %}

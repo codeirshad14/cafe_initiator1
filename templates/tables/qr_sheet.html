@@ -12,10 +12,11 @@
     <link href="{% static 'css/app.css' %}" rel="stylesheet">
 </head>
 {# always light: this page is for paper #}
-<body class="qr-sheet-page">
+<body class="qr-sheet-page" data-transient>
 
-{# screen only: what this page is and the Print button #}
+{# screen only: Back, what this page is, and the Print button #}
 <div class="qr-sheet-bar">
+    <a class="btn btn-light btn-sm qr-sheet-back" href="{% url 'tables:table_list' %}" data-go-back><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
     <div>
         <strong>QR sheet · {{ restaurant.name }}</strong>
         <small>{% if menus %}The order menu and the view-only menu{% else %}{{ cards|length }} active table{{ cards|length|pluralize }}{% if section %} in {{ section }}{% endif %}{% endif %}. Print on A4, cut along the dashed lines.</small>
@@ -75,5 +76,6 @@
     <p>Add tables on the Tables &amp; QR page first.</p>
 </div>
 {% endif %}
+{% include "partials/_go_back.html" %}
 </body>
 </html>

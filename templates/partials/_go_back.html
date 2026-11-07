@@ -1,0 +1,59 @@
+{% comment %}
+Back on every page, and the print pages kept out of Back. Included once by every base page.
+
+<a href="(the page it belongs to)" data-go-back>Back</a>
+  In the installed app (and on phones) there is often no browser Back, and closing a page
+  can close the whole app. So Back:
+    1. goes to the previous page when the guest or staff came from one of ours;
+    2. otherwise, in a print window opened next to the app on a computer: closes just
+       that window (the app is still there behind it);
+    3. otherwise goes to the link's own address (the bill, the menu, Home ...), in place
+       of this page (Back never adds a page to go back to).
+  Never closes the installed app itself.
+
+<body data-transient>: a page that is used once and left: the bill and KOT print pages,
+  the QR sheet, the UPI customer screen. Leaving it ends it, so no Back returns to it:
+    - its links with data-leave (Home) open their page in place of it;
+    - a Back that still lands on it (the phone's own back button, the top bar's Back after
+      it) steps straight past it to the screen before, without printing again
+      (window.mrcafeCameBack is true then: the print pages' auto-print checks it).
+{% endcomment %}
+<script>
+    (function () {
+        var transient = document.body.hasAttribute("data-transient");
+
+        // a transient page reached by going back: step past it (and print nothing)
+        var entry = window.performance && performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
+        window.mrcafeCameBack = transient && !!entry && entry.type === "back_forward";
+        if (window.mrcafeCameBack) history.back();
+        window.addEventListener("pageshow", function (event) {
+            if (transient && event.persisted) {  // brought back from the browser's page cache
+                window.mrcafeCameBack = true;
+                history.back();
+            }
+        });
+
+        document.addEventListener("click", function (event) {
+            var leave = event.target.closest("a[data-leave]");
+            if (leave && transient) {
+                event.preventDefault();
+                location.replace(leave.getAttribute("href"));  // this page is left behind for good
+                return;
+            }
+            var button = event.target.closest("[data-go-back]");
+            if (!button) return;
+            event.preventDefault();
+            var fallback = button.getAttribute("href") || button.dataset.fallback || "/";
+            var fromHere = document.referrer.indexOf(location.origin + "/") === 0;
+            if (fromHere && history.length > 1) {
+                history.back();
+                return;
+            }
+            var app = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+            if (!app && history.length <= 1 && fromHere) {
+                window.close();  // a print tab next to the app; if the browser does not allow it, the line below goes on
+            }
+            setTimeout(function () { location.replace(fallback); }, 150);
+        });
+    })();
+</script>

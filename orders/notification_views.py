@@ -12,6 +12,8 @@ or about an order, "Take away #216: How long for my order?", with a soft sound o
   notification_read_all  Mark all as read (for everyone)
 """
 
+from datetime import timedelta
+
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -26,6 +28,7 @@ from core.utils import get_user_location
 from .models import Notification
 
 SHOWN = 20  # the newest unread ones in the list; the count says how many in all
+KEEP_FOR = timedelta(hours=12)  # the bell shows what is new: an older note is past (not shown, not counted)
 
 
 def hears_calls(staff):
@@ -33,11 +36,17 @@ def hears_calls(staff):
     return staff.role in roles.FLOOR
 
 
-def unread(request):
+def all_unread(request):
+    """Every note nobody has opened yet at this location (a call: only for the Floor roles)."""
     waiting = Notification.objects.filter(location=get_user_location(request), read_at__isnull=True)
     if not hears_calls(request.user.staff):
         waiting = waiting.exclude(kind=Notification.Kind.CALL)
     return waiting
+
+
+def unread(request):
+    """What the bell shows: the unread notes of the last 12 hours, nothing older."""
+    return all_unread(request).filter(created_at__gte=timezone.now() - KEEP_FOR)
 
 
 def bell(request):
@@ -46,8 +55,9 @@ def bell(request):
     now = timezone.now()
     for note in notes:  # "Just now", "5 min ago", "1 h 20 min ago"
         note.minutes = int((now - note.created_at).total_seconds() // 60)
+        note.age = int((now - note.created_at).total_seconds())
     count = waiting.count()
-    # the newest call: static/js/app.js rings once when its number is new on this device
+    # the newest call: static/js/app.js rings once on this device, and only while it is fresh
     latest_call = next((note for note in notes if note.is_call), None)
     return render(request, "orders/_notification_bell.html", {
         "notifications": notes, "unread_count": count, "more": count - len(notes), "latest_call": latest_call,
@@ -96,6 +106,7 @@ def unread_or_read(request):
 @require_POST
 @role_required()
 def notification_read_all(request):
-    if unread(request).update(read_at=timezone.now(), read_by=request.user.staff):
-        bump(request.user.staff.restaurant_id)
+    """Mark all as read, for everyone: also the old ones the bell no longer shows."""
+    if all_unread(request).update(read_at=timezone.now(), read_by=request.user.staff):
+        bump(request.user.staff.restaurant_id)  # every other bell empties at once
     return bell(request)

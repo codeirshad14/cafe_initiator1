@@ -1116,3 +1116,43 @@ class CallFromEveryMenuTests(TestCase):
         Order.objects.filter(pk=order.pk).update(status="CLOSED")
         self.assertNotContains(guest.get(f"/track/{order.public_token}/"), "Need help with your order?")
         self.assertEqual(guest.post(f"/track/{order.public_token}/call/", {"reason": "HELP"}, **HTMX).status_code, 404)
+
+
+class OnlyNewNotificationsTests(TestCase):
+    """The bell shows what is new (the last 12 hours); one person's "read" is everyone's;
+    a call rings once per device and only while it is fresh."""
+
+    def setUp(self):
+        self.restaurant = make_restaurant()
+        _, self.paneer, _ = make_menu(self.restaurant)
+        self.table = make_table(self.restaurant, "T4")
+        self.admin = client_for(make_staff(self.restaurant, "ADMIN"))
+        self.cashier = client_for(make_staff(self.restaurant, "CASHIER"))
+
+    def test_old_notes_do_not_show_and_read_all_clears_them_too(self):
+        from datetime import timedelta
+        from orders.models import Notification
+        guest_orders(Client(), self.table, [self.paneer])
+        guest_orders(Client(), make_table(self.restaurant, "T5"), [self.paneer], name="Ravi")
+        old = Notification.objects.order_by("pk").first()
+        Notification.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(hours=13))
+        bell = self.cashier.get("/notifications/")
+        self.assertContains(bell, 'class="notify-count" aria-hidden="true">1<')  # yesterday's is past
+        self.assertNotContains(bell, f"order #{old.order.order_no}<")
+
+        self.admin.post("/notifications/read-all/")  # one person marks all as read
+        self.assertFalse(Notification.objects.filter(read_at__isnull=True).exists())  # the old one too
+        self.assertNotContains(self.cashier.get("/notifications/"), "notify-count")  # nothing for the others
+
+    def test_a_call_carries_its_age_so_only_new_ones_ring(self):
+        from datetime import timedelta
+        from orders.models import Notification
+        Client().post(f"/m/{self.table.qr_token}/call/", {"reason": "WATER"}, **HTMX)
+        self.assertContains(self.cashier.get("/notifications/"), 'data-call-age="0"')
+        Notification.objects.update(created_at=timezone.now() - timedelta(minutes=10))
+        self.assertContains(self.cashier.get("/notifications/"), 'data-call-age="600"')
+        from django.contrib.staticfiles import finders
+        with open(finders.find("js/app.js"), encoding="utf-8") as file:
+            script = file.read()
+        self.assertIn("const FRESH_CALL = 120;", script)
+        self.assertIn('document.cookie = HEARD_KEY + "="', script)  # remembered even without local storage

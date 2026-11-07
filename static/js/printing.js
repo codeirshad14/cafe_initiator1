@@ -7,6 +7,10 @@
                      the click sends the slip to it. If not, the link opens the
                      print page as before (the browser's print window).
    2. Printers page  #printerSettings: choose the bill and KOT printer, test them.
+   3. Same screen    on a phone or tablet, and in the installed app, print pages and
+                     [data-same-window] pages (QR sheet, UPI customer screen) open in
+                     the same screen, not a new window: their Back comes back here,
+                     and nothing can close the app (partials/_go_back.html).
 
    The printing itself is done by the print helper on this computer
    (print_helper/mrcafe_print.py, at 127.0.0.1:17180); the server makes the
@@ -92,6 +96,16 @@
       link.classList.remove("is-printing");
     });
   });
+
+  /* ------------------------------------- 3. same screen on phones / the app */
+  const asApp = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const touchScreen = window.matchMedia("(pointer: coarse)").matches && window.matchMedia("(max-width: 1199.98px)").matches;
+  if (asApp || touchScreen) {
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest("a[data-print], a[data-same-window]");
+      if (link && link.target) link.target = "_self";  // (a slip sent to the printer above opens nothing)
+    });
+  }
 
   /* --------------------------------------------------- 2. printers page */
   const settings = document.getElementById("printerSettings");

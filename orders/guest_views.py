@@ -577,8 +577,12 @@ def order_track(request, public_token):
         context["header_subtitle"] += " · Take away"
     elif order.table:
         context["header_subtitle"] += f" · {order.table.label}"
-        if context["can_order_more"]:
-            context["menu_url"] = order.table.menu_path
+    # ← back to the menu, always (also once paid: to order again): the table's menu, or the
+    # public menu for a parcel (the counter's address opens it)
+    if order.table and order.table.is_active and not order.table.is_common:
+        context["menu_url"] = order.table.menu_path
+    else:
+        context["menu_url"] = reverse("orders:public_menu", args=[order.restaurant.slug])
     return render(request, "orders/order_track.html", context)
 
 

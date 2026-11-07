@@ -16,7 +16,11 @@ once the cashier records the payment.
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{% static 'css/app.css' %}" rel="stylesheet">
 </head>
-<body class="upi-screen-page">
+<body class="upi-screen-page" data-transient>
+{# for the cashier: back to the bill (on a phone this screen opens in the app's own window) #}
+<a class="upi-screen-back" href="{% url 'billing:bill_detail' bill.pk %}" data-go-back aria-label="Back to the bill">
+    <i class="bi bi-arrow-left" aria-hidden="true"></i> Bill
+</a>
 <main class="upi-screen">
     <header class="upi-screen-head">
         {% if restaurant.logo %}<img src="{{ restaurant.logo.url }}" alt="">{% endif %}
@@ -25,5 +29,6 @@ once the cashier records the payment.
     {% include "billing/_upi_screen_body.html" %}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+{% include "partials/_go_back.html" %}
 </body>
 </html>

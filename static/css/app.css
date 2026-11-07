@@ -1617,6 +1617,30 @@ h5 {
     transform: translateY(-8px);
   }
 }
+/* phones and tablets: messages at the bottom, above the bottom bar, like an app's
+   snackbar (not over the page's title) */
+@media (max-width: 991.98px) {
+  .toast-area:not(.toast-area--customer) {
+    top: auto;
+    right: auto;
+    bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + 12px);
+    left: 50%;
+    width: min(420px, calc(100vw - 24px));
+    transform: translateX(-50%);
+  }
+  .toast-area:not(.toast-area--customer) .app-toast {
+    animation-name: toast-up;
+  }
+  .toast-area:not(.toast-area--customer) .app-toast.is-leaving {
+    transform: translateY(12px);
+  }
+}
+@keyframes toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
 
 /* ---- small buttons in a table row */
 .row-actions {
@@ -7757,19 +7781,57 @@ body.gm-sheet-open {
   font-size: 12px;
   line-height: 1.35;
 }
+/* the print page's bar: Back to the app, Print again, Home (big enough for a finger; not printed) */
 .print-tools {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   justify-content: center;
   gap: 8px;
   padding: 10px;
+  background: rgba(247, 245, 242, 0.95);
 }
-.print-tools button {
-  padding: 6px 14px;
-  border: 1px solid #999;
-  border-radius: 6px;
+.print-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #c9c2b8;
+  border-radius: 10px;
   background: #fff;
+  color: #1d1a17;
   font: inherit;
+  font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+}
+.print-tool--main {
+  border-color: #da3831;
+  background: #da3831;
+  color: #fff;
+}
+/* the QR sheet's and the UPI customer screen's Back */
+.qr-sheet-back {
+  flex: 0 0 auto;
+}
+.upi-screen-back {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+  text-decoration: none;
 }
 .slip {
   width: 72mm;
@@ -7871,20 +7933,69 @@ body.gm-sheet-open {
 }
 
 /* ============================== 7. Motion ============================== */
-@media (prefers-reduced-motion: no-preference) {
-  /* not the live blocks that replace themselves every few seconds (kitchen
-     board, floor), or they would fade in again on every refresh */
-.app-content > *:not([hx-trigger]) {
-    animation: rise 0.4s var(--ease) both;
-  }
-  .app-content > *:nth-child(2) { animation-delay: 0.04s; }
-  .app-content > *:nth-child(3) { animation-delay: 0.08s; }
-  .app-content > *:nth-child(4) { animation-delay: 0.12s; }
+/* Moving between screens feels like an app (Chrome, Edge, Safari: the browser's own view
+   transitions; others simply change the page): forward, the new screen slides in from the
+   right; Back (the top bar's or the phone's), from the left. The frame stays still: the top
+   bar, the side menu and the bottom bar are not part of the slide, only the screen. */
+@view-transition {
+  navigation: auto;
 }
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+.topbar {
+  view-transition-name: app-topbar;
+}
+.app-sidebar {
+  view-transition-name: app-sidebar;
+}
+.bottom-nav {
+  view-transition-name: app-bottom-nav;
+}
+::view-transition-group(*) {
+  animation-duration: 0.24s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(root) {
+  animation: 0.16s ease both screen-fade-out, 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both screen-to-left;
+}
+::view-transition-new(root) {
+  animation: 0.24s ease both screen-fade-in, 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both screen-from-right;
+}
+html:active-view-transition-type(back)::view-transition-old(root) {
+  animation-name: screen-fade-out, screen-to-right;
+}
+html:active-view-transition-type(back)::view-transition-new(root) {
+  animation-name: screen-fade-in, screen-from-left;
+}
+@keyframes screen-fade-out { to { opacity: 0; } }
+@keyframes screen-fade-in { from { opacity: 0; } }
+@keyframes screen-from-right { from { transform: translateX(28px); } }
+@keyframes screen-to-left { to { transform: translateX(-14px); } }
+@keyframes screen-from-left { from { transform: translateX(-28px); } }
+@keyframes screen-to-right { to { transform: translateX(14px); } }
+
+/* drawers (the phone's menu, the side panel): a calm slide that settles, a soft backdrop */
+.offcanvas,
+.offcanvas-lg {
+  --bs-offcanvas-transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.offcanvas-backdrop {
+  transition: opacity 0.3s ease;
+}
+.offcanvas-backdrop.show {
+  opacity: 0.4;
+}
+
+/* a page shown again by Back appears as it was left, settled: nothing slides or fades
+   (static/js/app.js part 13 puts this on for a moment) */
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -9852,6 +9963,25 @@ summary,
     background: var(--brand-solid);
     color: #fff;
     font-size: 1rem;
+  }
+}
+/* Back in the top bar (every staff page): a clear round arrow */
+.topbar-back {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+.topbar-back:hover {
+  color: var(--ink);
+}
+@media (max-width: 575.98px) {
+  .topbar-mark {
+    display: none; /* phones: Back takes its place */
+  }
+  .topbar-back {
+    width: 36px;
+    height: 36px;
   }
 }
 

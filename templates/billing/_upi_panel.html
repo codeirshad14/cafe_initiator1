@@ -21,7 +21,7 @@ screen"), then "Paid by UPI" records the payment and closes the panel.
     <img class="upi-qr" src="{% url 'billing:bill_upi_qr' bill.pk %}?v={{ amount }}" alt="UPI QR code for {{ amount|inr }}" width="260" height="260">
     <p class="upi-to">To <strong>{{ restaurant.bill_name }}</strong> · {{ restaurant.upi_id }}</p>
     <p class="form-hint text-center">Any UPI app: GPay, PhonePe, Paytm, BHIM. The amount is filled in for the guest.</p>
-    <a class="btn btn-light w-100" href="{% url 'billing:bill_upi_screen' bill.pk %}" target="upiScreen" rel="noopener">
+    <a class="btn btn-light w-100" href="{% url 'billing:bill_upi_screen' bill.pk %}" target="upiScreen" rel="noopener" data-same-window>
         <i class="bi bi-display" aria-hidden="true"></i> Customer screen (a second screen)
     </a>
     {% elif own_qr %}

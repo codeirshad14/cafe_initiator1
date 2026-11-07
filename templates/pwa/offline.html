@@ -34,6 +34,10 @@ file (no fonts or CSS from the internet). It reloads by itself once the internet
         }
         button:focus-visible { outline: 3px solid rgba(218, 56, 49, 0.35); outline-offset: 2px; }
         small { display: block; margin-top: 14px; color: var(--ink-2); }
+        .offline-back {
+            display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 10px;
+            border: 1px solid #ebe6df; border-radius: 12px; color: var(--ink); font-weight: 600; text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -42,8 +46,10 @@ file (no fonts or CSS from the internet). It reloads by itself once the internet
     <h1>No internet</h1>
     <p>Orders and bills need the internet. Check the Wi-Fi or mobile data, then try again.</p>
     <button type="button" onclick="location.reload()">Try again</button>
+    <a class="offline-back" href="/home/" data-go-back>&larr; Back</a>
     <small>This page opens again by itself once you are back online.</small>
 </main>
+{% include "partials/_go_back.html" %}
 <script>
     window.addEventListener("online", function () { location.reload(); });
 </script>

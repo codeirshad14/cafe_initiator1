@@ -12,5 +12,7 @@
     <h3>This table is not taking orders right now</h3>
     <p>The QR code may be old, or online ordering is switched off. Please ask the staff, they will be happy to take your order.</p>
     {% endif %}
+    {# back to where they came from; with nothing before it, the website (partials/_go_back.html) #}
+    <a class="btn btn-light mt-2" href="/" data-go-back><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
 </div>
 {% endblock %}
